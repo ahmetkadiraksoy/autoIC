@@ -17,7 +17,7 @@ def classify(train, test, clf):
         test_data = test[1:]
 
         # Find the index of the label column in the header
-        label_column_index = train_header.index('class')
+        label_column_index = train_header.index('label')
 
         # Extract features and labels
         train_features, train_labels = extract_features_and_labels(train_data, label_column_index)

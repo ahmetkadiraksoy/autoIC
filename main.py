@@ -45,6 +45,11 @@ def remove_duplicates_list_list(input_list):
     return [list(t) for t in set(tuple(row) for row in input_list)]
 
 def extract_features_from_pcap(pcap_folder_path, protocol, blacklisted_features):
+    # Create protocol folder
+    folder_path = f'{pcap_folder_path}/{protocol}'
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
+
     # Paths to input pcap file, feature names text file, and output CSV file
     feature_names_file = f'{pcap_folder_path}{protocol}.txt'
 
@@ -57,9 +62,9 @@ def extract_features_from_pcap(pcap_folder_path, protocol, blacklisted_features)
 
     # Write header row with feature names
     for i in range(3):
-        with open(f'{pcap_folder_path}{protocol}_packets_{i+1}.csv', 'w') as f:
+        with open(f'{pcap_folder_path}/{protocol}/batch_{i+1}.csv', 'w') as f:
             csv_line = ','.join(feature_names)
-            f.write(f"{csv_line},class\n")
+            f.write(f"{csv_line},label\n")
 
     # Loop through each pcap file in the provided folder
     for file in file_list:
@@ -115,7 +120,7 @@ def extract_features_from_pcap(pcap_folder_path, protocol, blacklisted_features)
             
             file_data = csv_data[start_idx:end_idx]
             
-            with open(f'{pcap_folder_path}{protocol}_packets_{i+1}.csv', 'a') as f:
+            with open(f'{pcap_folder_path}/{protocol}/batch_{i+1}.csv', 'a') as f:
                 for line in file_data:
                     csv_line = ','.join(line)
                     f.write(f"{csv_line}\n")
@@ -168,15 +173,22 @@ def main():
             print("converting pcap files to csv format ...")
             extract_features_from_pcap(folder, protocol, blacklisted_features)
             index += 1
-        elif sys.argv[index] in ('-ga'):
+        elif sys.argv[index] in ('-m', '--mode'):
             if folder == "":
                 print("Incorrect parameter order given!")
                 sys.exit(1)
 
-            print("running GA ...")
-            best_solution, best_fitness = ga.run(folder + protocol + "_packets_1.csv", folder + protocol + "_packets_2.csv", classifiers[classifier_index])
-            print(f"Best Solution: {best_solution}, Fitness: {best_fitness}")
-            index += 1
+            if index + 1 < len(sys.argv):
+                if sys.argv[index+1] == 'ga':
+                    print("running GA ...")
+                    best_solution, best_fitness = ga.run(folder + '/' + protocol + '/batch_1.csv', folder + '/' + protocol + '/batch_2.csv', classifiers[classifier_index])
+                    print(f"Best Solution: {best_solution}, Fitness: {best_fitness}")
+                else:
+                    print("Unknown entry for the mode")
+                index += 2  # Skip both the option and its value
+            else:
+                print("Missing value for -m/--mode option")
+                sys.exit(1)
         elif sys.argv[index] in ('-c', '--classify'):
             if index + 1 < len(sys.argv):
                 classifier_index = int(sys.argv[index + 1])
