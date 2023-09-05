@@ -4,7 +4,6 @@ import ml
 from collections import defaultdict
 import concurrent.futures
 import os
-import sys
 import threading
 
 # Define a lock for synchronization
@@ -156,7 +155,6 @@ def run(packets_1_location, packets_2_location, clf):
 
     # Determine solution size (number of features)
     with open(packets_1_location, 'r') as file:
-        # Read the first line
         first_line = file.readline()
     solution_size = len(first_line.split(',')) - 1
 

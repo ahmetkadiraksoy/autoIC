@@ -4,6 +4,7 @@ import sys
 import os
 import re
 import ga
+import aco
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVC
@@ -182,6 +183,10 @@ def main():
                 if sys.argv[index+1] == 'ga':
                     print("running GA ...")
                     best_solution, best_fitness = ga.run(folder + '/' + protocol + '/batch_1.csv', folder + '/' + protocol + '/batch_2.csv', classifiers[classifier_index])
+                    print(f"Best Solution: {best_solution}, Fitness: {best_fitness}")
+                elif sys.argv[index+1] == 'aco':
+                    print("running ACO ...")
+                    best_solution, best_fitness = aco.run(folder + '/' + protocol + '/batch_1.csv', folder + '/' + protocol + '/batch_2.csv', classifiers[classifier_index])
                     print(f"Best Solution: {best_solution}, Fitness: {best_fitness}")
                 else:
                     print("Unknown entry for the mode")
