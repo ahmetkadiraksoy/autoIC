@@ -9,6 +9,7 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVC
 from sklearn.neural_network import MLPClassifier
+import pandas as pd
 
 MAX_32BIT_INT = 2 ** 32
 
@@ -59,9 +60,13 @@ def extract_features_from_pcap(pcap_folder_path, protocol, blacklisted_features)
     file_list = [f for f in os.listdir(pcap_folder_path) if f.endswith('.pcap')]
 
     # Read feature names from the text file
-    with open(feature_names_file, 'r') as f:
-        feature_names = f.read().splitlines()
-        feature_names = [feature for feature in feature_names if feature not in blacklisted_features]
+    if os.path.exists(feature_names_file):
+        with open(feature_names_file, 'r') as f:
+            feature_names = f.read().splitlines()
+            feature_names = [feature for feature in feature_names if feature not in blacklisted_features]
+    else:
+        print(f"The file '{feature_names_file}' was not found.")
+        sys.exit(1)
 
     # Write header row with feature names
     for i in range(3):
@@ -71,6 +76,7 @@ def extract_features_from_pcap(pcap_folder_path, protocol, blacklisted_features)
 
     # Loop through each pcap file in the provided folder
     for file in file_list:
+        print("processing " + file + "...")
         class_name = file.split('.pcap')[0]
         pcap_file_path = pcap_folder_path + file
 
@@ -128,10 +134,35 @@ def extract_features_from_pcap(pcap_folder_path, protocol, blacklisted_features)
                     csv_line = ','.join(line)
                     f.write(f"{csv_line}\n")
 
+    # Determine features that are empty across all 3 batches
+    intersection_of_columns_with_all_nan = {}
+    for i in range(3):
+        # Read the CSV file into a DataFrame
+        df = pd.read_csv(f'{pcap_folder_path}/{protocol}/batch_{i+1}.csv')
+
+        # Get a list of column names with all NaN values
+        columns_with_all_nan = df.columns[df.isnull().all()].tolist()
+        if len(intersection_of_columns_with_all_nan) == 0:
+            intersection_of_columns_with_all_nan = set(columns_with_all_nan)
+        else:
+            intersection_of_columns_with_all_nan = intersection_of_columns_with_all_nan & set(columns_with_all_nan)
+
+    # Remove the empty features from the csv files
+    if len(intersection_of_columns_with_all_nan) > 0:
+        for i in range(3):
+            # Read the CSV file into a DataFrame
+            df = pd.read_csv(f'{pcap_folder_path}/{protocol}/batch_{i+1}.csv')
+
+            # Remove the specified columns from the DataFrame
+            df = df.drop(columns=intersection_of_columns_with_all_nan, errors='ignore')
+
+            # Save the modified DataFrame back to a CSV file
+            df.to_csv(f'{pcap_folder_path}/{protocol}/batch_{i+1}.csv', index=False, na_rep='NaN')
+
 def main():
     # Check if at least one argument (excluding the script name) is provided
     if len(sys.argv) < 2:
-        print("Usage: python script.py arg1 arg2 ...")
+        print("Usage: python script.py arg1 arg2...")
         sys.exit(1)
 
     # List of classifiers to test
@@ -148,7 +179,24 @@ def main():
     blacklisted_features = [
         'ip.src',
         'ip.dst',
-        'ip.id'
+        'ip.id',
+        'ip.geoip.src_isp',
+        'ip.geoip.isp',
+        'ip.geoip.dst_isp',
+        'ip.dsfield.ect',
+        'ip.dsfield.ce',
+        'ip.checksum_good',
+        'ip.checksum_bad',
+        'ip.checksum',
+        'ip.checksum.status',
+        'ip.checksum_bad',
+        'ip.checksum_bad.expert',
+        'ip.checksum_calculated',
+        'ip.checksum_good',
+        'ip.dst_host',
+        'ip.host',
+        'ip.addr',
+        'ip.src_host'
     ]
 
     # Loop through command-line arguments starting from the second element
@@ -173,7 +221,7 @@ def main():
                 print("Incorrect parameter order given!")
                 sys.exit(1)
 
-            print("converting pcap files to csv format ...")
+            print("converting pcap files to csv format...")
             extract_features_from_pcap(folder, protocol, blacklisted_features)
             index += 1
         elif sys.argv[index] in ('-m', '--mode'):
@@ -183,11 +231,11 @@ def main():
 
             if index + 1 < len(sys.argv):
                 if sys.argv[index+1] == 'ga':
-                    print("running GA ...")
+                    print("running GA...")
                     best_solution, best_fitness = ga.run(folder + '/' + protocol + '/batch_1.csv', folder + '/' + protocol + '/batch_2.csv', classifiers[classifier_index])
                     print(f"Best Solution: {best_solution}, Fitness: {best_fitness}")
                 elif sys.argv[index+1] == 'aco':
-                    print("running ACO ...")
+                    print("running ACO...")
                     best_solution, best_fitness = aco.run(folder + '/' + protocol + '/batch_1.csv', folder + '/' + protocol + '/batch_2.csv', classifiers[classifier_index])
                     print(f"Best Solution: {best_solution}, Fitness: {best_fitness}")
                 else:
