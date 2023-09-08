@@ -10,6 +10,8 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVC
 from sklearn.neural_network import MLPClassifier
 
+MAX_32BIT_INT = 2 ** 32
+
 def is_numeric(input_string):
     try:
         float(input_string)  # Try to convert the string to a float
@@ -90,27 +92,27 @@ def extract_features_from_pcap(pcap_folder_path, protocol, blacklisted_features)
         # Modify dataset
         for i in range(len(csv_data)):
             for j in range(len(csv_data[i]) - 1):
-                cell = csv_data[i][j]
-                if cell.startswith("0x"):  # Hexadecimal
-                    csv_data[i][j] = str(int(cell[2:], 16))
-                elif ',' in cell:  # Contains ','
-                    if is_numeric(cell.replace(',', '')):  # Situation: 1,3,2,4
-                        numbers = cell.split(',')
-                        result = 0
-                        for k in range(len(numbers)):
-                            result += float(numbers[k]) * (10 ** (len(numbers) - 1 - k))
-                        csv_data[i][j] = str("{:.0f}".format(result))
-                    else:  # Cell is alphanumeric
-                        # Calculate the hash value using the hash() function
-                        decimal_hash = hash(cell)
-
-                        # Ensure the hash value is non-negative (hash() can return negative values)
-                        if decimal_hash < 0:
-                            decimal_hash += 2 ** 32  # Convert to a non-negative 32-bit integer
-
-                        csv_data[i][j] = decimal_hash
-                elif len(csv_data[i][j]) == 0:
+                if len(csv_data[i][j]) == 0:
                     csv_data[i][j] = 'NaN'
+                else:
+                    cell = csv_data[i][j]
+                    tokens = cell.split(',')
+
+                    total = 0
+                    for token in tokens:
+                        if token.startswith("0x"): # Hexadecimal
+                            token = str(int(token[2:], 16))
+                        elif not is_numeric(cell.replace(',', '')): # Alphanumeric
+                            # Calculate the hash value using the hash() function
+                            decimal_hash = hash(token)
+
+                            # Ensure the hash value is non-negative (hash() can return negative values)
+                            if decimal_hash < 0:
+                                decimal_hash += MAX_32BIT_INT  # Convert to a non-negative 32-bit integer
+
+                            token = decimal_hash
+                        total += int(token)
+                    csv_data[i][j] = str(total)
 
         # Calculate the number of lines per file
         lines_per_file = len(csv_data) // 3
