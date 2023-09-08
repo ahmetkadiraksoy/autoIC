@@ -1,11 +1,9 @@
 import random
+import threading
 import csv
 import ml
-import numpy as np
 from collections import defaultdict
-import concurrent.futures
-import threading
-import os
+import sys
 
 # Define a lock for synchronization
 ga_solutions_lock = threading.Lock()
@@ -14,11 +12,13 @@ ga_solutions_lock = threading.Lock()
 def load_csv(file_path):
     with open(file_path, 'r') as f:
         reader = csv.reader(f)
-        data = list(reader)
+        data = [row for row in reader]
     return data
 
+# Define the fitness function
 def evaluate_fitness(solution, packets_1, packets_2, clf, ga_solutions):
-    if not any(solution):
+    # If no features are to be selected
+    if sum(solution) == 0:
         return 0.0
 
     key = ''.join(map(str, solution))
@@ -28,20 +28,26 @@ def evaluate_fitness(solution, packets_1, packets_2, clf, ga_solutions):
         if key in ga_solutions:
             return ga_solutions[key]
 
-    solution_new = solution + [1]
+    # Append 1 to the end so that it doesn't filter out the 'class' column
+    solution_new = list(solution)
+    solution_new.append(1)
 
+    # Filter features
     filtered_packets_1 = [[col for col, m in zip(row, solution_new) if m] for row in packets_1]
     filtered_packets_2 = [[col for col, m in zip(row, solution_new) if m] for row in packets_2]
-
+    
     fitness_1 = ml.classify(filtered_packets_1, filtered_packets_2, clf)
     fitness_2 = ml.classify(filtered_packets_2, filtered_packets_1, clf)
 
     average_accuracy = (fitness_1 + fitness_2) / 2.0
 
+    # Calculate feature accuracy
     num_selected_features = sum(solution)
-    total_features = len(solution) - 1
+    total_features = len(solution) - 1  # Excluding the class column
+
     feature_accuracy = 1 - ((num_selected_features - 1) / total_features)
 
+    # Calculate fitness as a weighted combination of average accuracy and feature accuracy
     fitness = 0.9 * average_accuracy + 0.1 * feature_accuracy
 
     # Acquire the lock before updating ga_solutions
@@ -50,109 +56,80 @@ def evaluate_fitness(solution, packets_1, packets_2, clf, ga_solutions):
 
     return fitness
 
-def generate_ant_solution(solution_size, current_node, ant_solution, pheromone_matrix, packets_1, packets_2, clf, alpha, beta, ga_solutions):
-    probabilities = []
-    total_probability = 0.0
-
-    for feature in range(solution_size):
-        if feature == current_node or ant_solution[feature] == 1:
-            probabilities.append(0.0)
-        else:
-            pheromone = pheromone_matrix[current_node][feature]
-            heuristic = evaluate_fitness(ant_solution[:feature] + [1] + ant_solution[feature + 1:], packets_1, packets_2, clf, ga_solutions)
-            probability = (pheromone ** alpha) * (heuristic ** beta)
-            probabilities.append(probability)
-            total_probability += probability
-
-    if total_probability == 0.0:
-        return random.choice([i for i, prob in enumerate(probabilities) if prob == 0.0])
-
-    normalized_probabilities = [prob / total_probability for prob in probabilities]
-    selected_feature = np.random.choice(range(solution_size), p=normalized_probabilities)
-
-    return selected_feature
-
-def update_pheromone(pheromone_matrix, ant_population, fitness_scores, rho, q, solution_size, population_size):
-    pheromone_delta = np.zeros((solution_size, solution_size))
-
-    for i in range(population_size):
-        ant_solution = ant_population[i]
-        fitness = fitness_scores[i]
-
-        for j in range(solution_size):
-            if ant_solution[j] == 1:
-                pheromone_delta[j][j] += q / fitness
-
-    pheromone_matrix = (1 - rho) * pheromone_matrix + pheromone_delta
-    return pheromone_matrix
-
-def ant_colony_optimization(population_size, solution_size, num_generations, alpha, beta, rho, q, packets_1_location, packets_2_location, clf, num_of_iterations, ga_solutions):
+# Define the ACO algorithm
+def ant_colony_optimization(n_ants, n_iterations, pheromone_decay, pheromone_strength, lock, packets_1_location, packets_2_location, clf, solution_size, ga_solutions):
     # Load the packets
     packets_1 = load_csv(packets_1_location)
     packets_2 = load_csv(packets_2_location)
 
-    pheromone_matrix = np.ones((solution_size, solution_size))
+    # Initialize the pheromone matrix with equal values for each ant
+    pheromones = [1.0] * n_ants
+
+    # Define the ant behavior
+    def ant_behavior(ant_index, solutions, fitness_values):
+        # Each ant chooses a solution based on the pheromone levels
+        # and the fitness function, and deposits pheromones accordingly
+        solution = solutions[ant_index]
+        fitness_value = fitness_values[ant_index]
+        lock.acquire()
+        pheromones[ant_index] += pheromone_strength * fitness_value  # Increase pheromone based on fitness
+        pheromones[ant_index] *= pheromone_decay  # Decay pheromone
+        lock.release()
+
+    # Run the algorithm until the same best solution is produced 'n_iterations' times in a row
+    best_solution_counter = 0
+    iteration_counter = 0
     best_solution = None
-    best_fitness = 0.0
+    best_fitness = None
+    best_ones = None
 
-    consecutive_same_solution_count = 0
+    while best_solution_counter + 1 < n_iterations:
+        threads = []
+        solutions = [[random.randint(0, 1) for _ in range(solution_size)] for _ in range(n_ants)]
+        fitness_values = [evaluate_fitness(s, packets_1, packets_2, clf, ga_solutions) for s in solutions]
 
-    for generation in range(num_generations):
-        ant_population = []
+        current_best_solution = None
+        current_best_fitness = None
+        current_best_ones = None
 
-        for _ in range(population_size):
-            current_node = 0
-            ant_solution = [0] * solution_size
+        for j in range(n_ants):
+            t = threading.Thread(target=ant_behavior, args=(j, solutions, fitness_values))
+            threads.append(t)
+            t.start()
 
-            for _ in range(solution_size):
-                next_node = generate_ant_solution(solution_size, current_node, ant_solution, pheromone_matrix, packets_1, packets_2, clf, alpha, beta, ga_solutions)
-                ant_solution[next_node] = 1
-                current_node = next_node
+        for t in threads:
+            t.join()
 
-            ant_population.append(ant_solution)
+        # Choose the best solution based on the fitness values
+        ant_fitness_max_index = fitness_values.index(max(fitness_values))
+        current_best_solution = solutions[ant_fitness_max_index]
+        current_best_fitness = evaluate_fitness(current_best_solution, packets_1, packets_2, clf, ga_solutions)
+        current_best_ones = sum(current_best_solution)
 
-        old_best_solution = best_solution
-
-        # Evaluate the fitness of each solution in the population using multi-threading
-        fitness_scores = []
-        num_cores = os.cpu_count() - 1 # Determine the number of CPU cores minus 1
-        with concurrent.futures.ThreadPoolExecutor(max_workers=num_cores) as executor:
-            for solution in ant_population:
-                future = executor.submit(evaluate_fitness, solution, packets_1, packets_2, clf, ga_solutions)
-                fitness_scores.append(future.result())
-
-        max_fitness_index = np.argmax(fitness_scores)
-
-        if fitness_scores[max_fitness_index] > best_fitness:
-            best_solution = ant_population[max_fitness_index]
-            best_fitness = fitness_scores[max_fitness_index]
-
-        if old_best_solution == None:
-            old_best_solution = best_solution
-
-        pheromone_matrix = update_pheromone(pheromone_matrix, ant_population, fitness_scores, rho, q, solution_size, population_size)
-
-        if best_solution == old_best_solution:
-            consecutive_same_solution_count += 1
+        # If the current best solution is better than the previous best solution,
+        # update the best solution and best fitness
+        if best_solution is None or current_best_fitness > evaluate_fitness(best_solution, packets_1, packets_2, clf, ga_solutions):
+            best_solution = current_best_solution
+            best_fitness = current_best_fitness
+            best_ones = current_best_ones
+            best_solution_counter = 0
         else:
-            consecutive_same_solution_count = 0
-        print(f"Generation {generation + 1}: {best_solution}, Fitness: {best_fitness}")
+            best_solution_counter += 1
 
-        # Terminate if the same solution has been observed consecutively for a specified number of times
-        if consecutive_same_solution_count >= num_of_iterations:
-            break
+        iteration_counter += 1
 
-    return best_solution, best_fitness
+        # Print current best solution with a grid of filled squares for 1 and empty squares for 0
+        print(f"Generation {iteration_counter}:\t[{''.join(map(str, best_solution))}]\tFitness: {best_fitness}")
+
+    # Return the best solution and its fitness value
+    return (best_solution, best_fitness)
 
 def run(packets_1_location, packets_2_location, clf):
-    # Example usage:
-    population_size = 50
-    num_generations = 100
-    num_of_iterations = 10
-    alpha = 1.0
-    beta = 1.0
-    rho = 0.1
-    q = 1.0
+    n_ants = 10
+    n_iterations = 10
+    pheromone_strength = 1
+    pheromone_decay = 0.5
+    lock = threading.Lock()
     ga_solutions = defaultdict(float)
 
     # Determine solution size (number of features)
@@ -160,4 +137,4 @@ def run(packets_1_location, packets_2_location, clf):
         first_line = file.readline()
     solution_size = len(first_line.split(',')) - 1
 
-    return ant_colony_optimization(population_size, solution_size, num_generations, alpha, beta, rho, q, packets_1_location, packets_2_location, clf, num_of_iterations, ga_solutions)
+    return ant_colony_optimization(n_ants, n_iterations, pheromone_decay, pheromone_strength, lock, packets_1_location, packets_2_location, clf, solution_size, ga_solutions)

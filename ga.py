@@ -1,10 +1,11 @@
 import random
 import csv
 import ml
-from collections import defaultdict
 import concurrent.futures
 import os
 import threading
+import sys
+from collections import defaultdict
 
 # Define a lock for synchronization
 ga_solutions_lock = threading.Lock()
@@ -131,7 +132,7 @@ def genetic_algorithm(pop_size, solution_size, num_generations, mutation_rate, c
         else:
             best_solution = new_best_solution
             consecutive_same_solution_count = 0
-        print(f"Generation {generation}: {best_solution}, Fitness: {max(fitness_scores)}")
+        print(f"Generation {generation}:\t[{''.join(map(str, best_solution))}]\tFitness: {max(fitness_scores)}")
         
         # Terminate if the same solution has been observed consecutively for a specified number of times
         if consecutive_same_solution_count >= num_of_iterations:

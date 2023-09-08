@@ -5,11 +5,12 @@ import os
 import re
 import ga
 import aco
+import json
+import pandas as pd
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVC
 from sklearn.neural_network import MLPClassifier
-import pandas as pd
 
 MAX_32BIT_INT = 2 ** 32
 
@@ -48,6 +49,9 @@ def fix_trailing_character(input_string):
 def remove_duplicates_list_list(input_list):
     return [list(t) for t in set(tuple(row) for row in input_list)]
 
+def remove_rows_with_nan(data):
+    return [list(row) for row in data if not all(entry == "" for entry in row[:-1])]
+
 def extract_features_from_pcap(pcap_folder_path, protocol, blacklisted_features):
     # Create protocol folder
     folder_path = f'{pcap_folder_path}/{protocol}'
@@ -74,10 +78,16 @@ def extract_features_from_pcap(pcap_folder_path, protocol, blacklisted_features)
             csv_line = ','.join(feature_names)
             f.write(f"{csv_line},label\n")
 
+    # List of classes (dict)
+    list_of_classes = {}
+    list_counter = 0
+
     # Loop through each pcap file in the provided folder
     for file in file_list:
         print("processing " + file + "...")
+
         class_name = file.split('.pcap')[0]
+        list_of_classes[class_name] = list_counter
         pcap_file_path = pcap_folder_path + file
 
         # Prepare the tshark command to be executed
@@ -90,10 +100,13 @@ def extract_features_from_pcap(pcap_folder_path, protocol, blacklisted_features)
         tshark_output = subprocess.check_output(tshark_cmd, universal_newlines=True)
 
         # Parse tshark output and write to CSV file
-        csv_data = [line.split('\t') + [class_name] for line in tshark_output.strip().split('\n')]
+        csv_data = [line.split('\t') + [str(list_counter)] for line in tshark_output.strip().split('\n') if len(line.split('\t')) == len(feature_names)]
 
         # Remove duplicates
         csv_data = remove_duplicates_list_list(csv_data)
+
+        # Filter out rows where the 'label' column is not 'NaN'
+        csv_data = remove_rows_with_nan(csv_data)
 
         # Modify dataset
         for i in range(len(csv_data)):
@@ -111,34 +124,35 @@ def extract_features_from_pcap(pcap_folder_path, protocol, blacklisted_features)
                         elif not is_numeric(cell.replace(',', '')): # Alphanumeric
                             # Calculate the hash value using the hash() function
                             decimal_hash = hash(token)
-
-                            # Ensure the hash value is non-negative (hash() can return negative values)
-                            if decimal_hash < 0:
-                                decimal_hash += MAX_32BIT_INT  # Convert to a non-negative 32-bit integer
-
                             token = decimal_hash
-                        total += int(token)
-                    csv_data[i][j] = str(total)
+                        total += float(token)
+                    csv_data[i][j] = str(total % 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)
 
         # Calculate the number of lines per file
         lines_per_file = len(csv_data) // 3
 
+        # Write the packets to CSV file
         for i in range(3):
             start_idx = i * lines_per_file
             end_idx = start_idx + lines_per_file if i < 2 else None
             
             file_data = csv_data[start_idx:end_idx]
-            
+
             with open(f'{pcap_folder_path}/{protocol}/batch_{i+1}.csv', 'a') as f:
                 for line in file_data:
                     csv_line = ','.join(line)
                     f.write(f"{csv_line}\n")
+        list_counter += 1
+
+    # Write class list to file
+    with open(f'{pcap_folder_path}/{protocol}/classes.json', "w") as json_file:
+        json.dump(list_of_classes, json_file)
 
     # Determine features that are empty across all 3 batches
     intersection_of_columns_with_all_nan = {}
     for i in range(3):
         # Read the CSV file into a DataFrame
-        df = pd.read_csv(f'{pcap_folder_path}/{protocol}/batch_{i+1}.csv')
+        df = pd.read_csv(f'{pcap_folder_path}/{protocol}/batch_{i+1}.csv', low_memory=False)
 
         # Get a list of column names with all NaN values
         columns_with_all_nan = df.columns[df.isnull().all()].tolist()
@@ -151,7 +165,7 @@ def extract_features_from_pcap(pcap_folder_path, protocol, blacklisted_features)
     if len(intersection_of_columns_with_all_nan) > 0:
         for i in range(3):
             # Read the CSV file into a DataFrame
-            df = pd.read_csv(f'{pcap_folder_path}/{protocol}/batch_{i+1}.csv')
+            df = pd.read_csv(f'{pcap_folder_path}/{protocol}/batch_{i+1}.csv', low_memory=False)
 
             # Remove the specified columns from the DataFrame
             df = df.drop(columns=intersection_of_columns_with_all_nan, errors='ignore')
@@ -196,7 +210,35 @@ def main():
         'ip.dst_host',
         'ip.host',
         'ip.addr',
-        'ip.src_host'
+        'ip.src_host',
+        'tcp.options.wscale_val',
+        'tcp.options.type.number',
+        'tcp.options.type.copy',
+        'tcp.options.type.class',
+        'tcp.options.type',
+        'tcp.options.time_stamp',
+        'tcp.options.scpsflags.reserved3',
+        'tcp.options.scpsflags.reserved2',
+        'tcp.options.scpsflags.reserved1',
+        'tcp.options.rvbd.probe.len',
+        'tcp.options.mptcp.sendtruncmac',
+        'tcp.options.mptcp.sendmac',
+        'tcp.options.mptcp.dataseqno',
+        'tcp.options.mptcp.dataack',
+        'tcp.options.mood_val',
+        'tcp.options.mood',
+        'tcp.options.experimental.magic_number',
+        'tcp.options.echo_reply',
+        'tcp.flags.ecn',
+        'tcp.data',
+        'tcp.connection.sack',
+        'tcp.checksum_good',
+        'tcp.checksum_bad',
+        'mptcp.analysis.unsupported_algorithm',
+        'mptcp.analysis.unexpected_idsn',
+        'mptcp.analysis.missing_algorithm',
+        'mptcp.analysis.echoed_key_mismatch',
+        'tcp.flags.ns'
     ]
 
     # Loop through command-line arguments starting from the second element
@@ -246,7 +288,7 @@ def main():
                 sys.exit(1)
         elif sys.argv[index] in ('-c', '--classify'):
             if index + 1 < len(sys.argv):
-                classifier_index = int(sys.argv[index + 1])
+                classifier_index = int(sys.argv[index+1])
                 index += 2  # Skip both the option and its value
             else:
                 print("Missing value for -f/--folder option")
