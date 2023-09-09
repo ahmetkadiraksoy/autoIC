@@ -1,3 +1,7 @@
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.svm import SVC
+from sklearn.neural_network import MLPClassifier
 import subprocess
 import csv
 import sys
@@ -7,10 +11,6 @@ import ga
 import aco
 import json
 import pandas as pd
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.svm import SVC
-from sklearn.neural_network import MLPClassifier
 
 MAX_32BIT_INT = 2 ** 32
 
@@ -52,16 +52,24 @@ def remove_duplicates_list_list(input_list):
 def remove_rows_with_nan(data):
     return [list(row) for row in data if not all(entry == "" for entry in row[:-1])]
 
-def extract_features_from_pcap(pcap_folder_path, protocol, blacklisted_features):
+def extract_features_from_pcap(folder, protocol):
     # Create protocol folder
-    folder_path = f'{pcap_folder_path}/{protocol}'
-    if not os.path.exists(folder_path):
-        os.makedirs(folder_path)
+    protocol_folder_path = f'{folder}{protocol}'
+    if not os.path.exists(protocol_folder_path):
+        os.makedirs(protocol_folder_path)
 
-    # Paths to input pcap file, feature names text file, and output CSV file
-    feature_names_file = f'{pcap_folder_path}{protocol}.txt'
+    file_list = [f for f in os.listdir(folder + "pcap") if f.endswith('.pcap')]
 
-    file_list = [f for f in os.listdir(pcap_folder_path) if f.endswith('.pcap')]
+    blacklist_file = f'{folder}filters/blacklist.txt'
+    feature_names_file = f'{folder}filters/{protocol}.txt'
+
+    # Read blacklisted features
+    if os.path.exists(blacklist_file):
+        with open(blacklist_file, 'r') as f:
+            blacklisted_features = f.read().splitlines()
+    else:
+        print(f"The file '{blacklist_file}' was not found.")
+        sys.exit(1)
 
     # Read feature names from the text file
     if os.path.exists(feature_names_file):
@@ -74,7 +82,7 @@ def extract_features_from_pcap(pcap_folder_path, protocol, blacklisted_features)
 
     # Write header row with feature names
     for i in range(3):
-        with open(f'{pcap_folder_path}/{protocol}/batch_{i+1}.csv', 'w') as f:
+        with open(f'{folder}{protocol}/batch_{i+1}.csv', 'w') as f:
             csv_line = ','.join(feature_names)
             f.write(f"{csv_line},label\n")
 
@@ -88,7 +96,7 @@ def extract_features_from_pcap(pcap_folder_path, protocol, blacklisted_features)
 
         class_name = file.split('.pcap')[0]
         list_of_classes[class_name] = list_counter
-        pcap_file_path = pcap_folder_path + file
+        pcap_file_path = folder + "pcap/" + file
 
         # Prepare the tshark command to be executed
         tshark_cmd = ['tshark', '-r', pcap_file_path, '-T', 'fields']
@@ -111,21 +119,30 @@ def extract_features_from_pcap(pcap_folder_path, protocol, blacklisted_features)
         # Modify dataset
         for i in range(len(csv_data)):
             for j in range(len(csv_data[i]) - 1):
-                if len(csv_data[i][j]) == 0:
+                cell = csv_data[i][j]
+
+                # If the cell is empty, replace it with 'NaN'
+                if len(cell) == 0:
                     csv_data[i][j] = 'NaN'
                 else:
-                    cell = csv_data[i][j]
                     tokens = cell.split(',')
-
                     total = 0
+
+                    # Loop through tokens in the cell
                     for token in tokens:
-                        if token.startswith("0x"): # Hexadecimal
-                            token = str(int(token[2:], 16))
-                        elif not is_numeric(cell.replace(',', '')): # Alphanumeric
+                        if token.startswith("0x"):  # Hexadecimal
+                            # Convert hexadecimal to decimal
+                            decimal_value = int(token, 16)
+                            token = str(decimal_value)
+                        elif not is_numeric(token.replace(',', '')):  # Alphanumeric
                             # Calculate the hash value using the hash() function
                             decimal_hash = hash(token)
-                            token = decimal_hash
+                            token = str(decimal_hash)
+                        
+                        # Sum up the numeric values
                         total += float(token)
+                    
+                    # Replace the cell value with the remainder modulo a large constant
                     csv_data[i][j] = str(total % 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)
 
         # Calculate the number of lines per file
@@ -138,21 +155,21 @@ def extract_features_from_pcap(pcap_folder_path, protocol, blacklisted_features)
             
             file_data = csv_data[start_idx:end_idx]
 
-            with open(f'{pcap_folder_path}/{protocol}/batch_{i+1}.csv', 'a') as f:
+            with open(f'{folder}/{protocol}/batch_{i+1}.csv', 'a') as f:
                 for line in file_data:
                     csv_line = ','.join(line)
                     f.write(f"{csv_line}\n")
         list_counter += 1
 
     # Write class list to file
-    with open(f'{pcap_folder_path}/{protocol}/classes.json', "w") as json_file:
+    with open(f'{folder}/{protocol}/classes.json', "w") as json_file:
         json.dump(list_of_classes, json_file)
 
     # Determine features that are empty across all 3 batches
     intersection_of_columns_with_all_nan = {}
     for i in range(3):
         # Read the CSV file into a DataFrame
-        df = pd.read_csv(f'{pcap_folder_path}/{protocol}/batch_{i+1}.csv', low_memory=False)
+        df = pd.read_csv(f'{folder}/{protocol}/batch_{i+1}.csv', low_memory=False)
 
         # Get a list of column names with all NaN values
         columns_with_all_nan = df.columns[df.isnull().all()].tolist()
@@ -165,13 +182,13 @@ def extract_features_from_pcap(pcap_folder_path, protocol, blacklisted_features)
     if len(intersection_of_columns_with_all_nan) > 0:
         for i in range(3):
             # Read the CSV file into a DataFrame
-            df = pd.read_csv(f'{pcap_folder_path}/{protocol}/batch_{i+1}.csv', low_memory=False)
+            df = pd.read_csv(f'{folder}/{protocol}/batch_{i+1}.csv', low_memory=False)
 
             # Remove the specified columns from the DataFrame
             df = df.drop(columns=intersection_of_columns_with_all_nan, errors='ignore')
 
             # Save the modified DataFrame back to a CSV file
-            df.to_csv(f'{pcap_folder_path}/{protocol}/batch_{i+1}.csv', index=False, na_rep='NaN')
+            df.to_csv(f'{folder}/{protocol}/batch_{i+1}.csv', index=False, na_rep='NaN')
 
 def main():
     # Check if at least one argument (excluding the script name) is provided
@@ -190,56 +207,6 @@ def main():
     classifier_index = 0
     folder = ""
     protocol = ""
-    blacklisted_features = [
-        'ip.src',
-        'ip.dst',
-        'ip.id',
-        'ip.geoip.src_isp',
-        'ip.geoip.isp',
-        'ip.geoip.dst_isp',
-        'ip.dsfield.ect',
-        'ip.dsfield.ce',
-        'ip.checksum_good',
-        'ip.checksum_bad',
-        'ip.checksum',
-        'ip.checksum.status',
-        'ip.checksum_bad',
-        'ip.checksum_bad.expert',
-        'ip.checksum_calculated',
-        'ip.checksum_good',
-        'ip.dst_host',
-        'ip.host',
-        'ip.addr',
-        'ip.src_host',
-        'tcp.options.wscale_val',
-        'tcp.options.type.number',
-        'tcp.options.type.copy',
-        'tcp.options.type.class',
-        'tcp.options.type',
-        'tcp.options.time_stamp',
-        'tcp.options.scpsflags.reserved3',
-        'tcp.options.scpsflags.reserved2',
-        'tcp.options.scpsflags.reserved1',
-        'tcp.options.rvbd.probe.len',
-        'tcp.options.mptcp.sendtruncmac',
-        'tcp.options.mptcp.sendmac',
-        'tcp.options.mptcp.dataseqno',
-        'tcp.options.mptcp.dataack',
-        'tcp.options.mood_val',
-        'tcp.options.mood',
-        'tcp.options.experimental.magic_number',
-        'tcp.options.echo_reply',
-        'tcp.flags.ecn',
-        'tcp.data',
-        'tcp.connection.sack',
-        'tcp.checksum_good',
-        'tcp.checksum_bad',
-        'mptcp.analysis.unsupported_algorithm',
-        'mptcp.analysis.unexpected_idsn',
-        'mptcp.analysis.missing_algorithm',
-        'mptcp.analysis.echoed_key_mismatch',
-        'tcp.flags.ns'
-    ]
 
     # Loop through command-line arguments starting from the second element
     index = 1
@@ -255,6 +222,21 @@ def main():
             if index + 1 < len(sys.argv):
                 folder = fix_trailing_character(sys.argv[index + 1])
                 index += 2  # Skip both the option and its value
+                pcap_folder = folder + "pcap"
+                filter_folder = folder + "filters"
+
+                if not os.path.exists(folder):
+                    print(f"The folder {folder} is missing")
+                    sys.exit(1)
+                elif not os.path.exists(pcap_folder):
+                    print("The 'pcap' folder is missing")
+                    sys.exit(1)
+                elif not os.path.exists(filter_folder):
+                    print("The 'filters' folder is missing")
+                    sys.exit(1)
+                elif len([f for f in os.listdir(pcap_folder) if f.endswith('.pcap')]) == 0:
+                    print("There are not pcap files in the 'pcap' folder")
+                    sys.exit(1)
             else:
                 print("Missing value for -f/--folder option")
                 sys.exit(1)
@@ -264,7 +246,7 @@ def main():
                 sys.exit(1)
 
             print("converting pcap files to csv format...")
-            extract_features_from_pcap(folder, protocol, blacklisted_features)
+            extract_features_from_pcap(folder, protocol)
             index += 1
         elif sys.argv[index] in ('-m', '--mode'):
             if folder == "":
@@ -274,11 +256,11 @@ def main():
             if index + 1 < len(sys.argv):
                 if sys.argv[index+1] == 'ga':
                     print("running GA...")
-                    best_solution, best_fitness = ga.run(folder + '/' + protocol + '/batch_1.csv', folder + '/' + protocol + '/batch_2.csv', classifiers[classifier_index])
+                    best_solution, best_fitness = ga.run(folder + protocol + '/batch_1.csv', folder + protocol + '/batch_2.csv', classifiers[classifier_index])
                     print(f"Best Solution: {best_solution}, Fitness: {best_fitness}")
                 elif sys.argv[index+1] == 'aco':
                     print("running ACO...")
-                    best_solution, best_fitness = aco.run(folder + '/' + protocol + '/batch_1.csv', folder + '/' + protocol + '/batch_2.csv', classifiers[classifier_index])
+                    best_solution, best_fitness = aco.run(folder + protocol + '/batch_1.csv', folder + protocol + '/batch_2.csv', classifiers[classifier_index])
                     print(f"Best Solution: {best_solution}, Fitness: {best_fitness}")
                 else:
                     print("Unknown entry for the mode")

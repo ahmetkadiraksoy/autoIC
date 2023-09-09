@@ -1,14 +1,13 @@
+from collections import defaultdict
 import random
 import csv
 import ml
 import concurrent.futures
 import os
 import threading
-import sys
-from collections import defaultdict
 
 # Define a lock for synchronization
-ga_solutions_lock = threading.Lock()
+thread_lock = threading.Lock()
 
 # Load and prepare data
 def load_csv(file_path):
@@ -33,7 +32,7 @@ def evaluate_fitness(solution, packets_1, packets_2, clf, ga_solutions):
     key = ''.join(map(str, solution))
 
     # Acquire the lock before reading ga_solutions
-    with ga_solutions_lock:
+    with thread_lock:
         if key in ga_solutions:
             return ga_solutions[key]
 
@@ -60,7 +59,7 @@ def evaluate_fitness(solution, packets_1, packets_2, clf, ga_solutions):
     fitness = 0.9 * average_accuracy + 0.1 * feature_accuracy
 
     # Acquire the lock before updating ga_solutions
-    with ga_solutions_lock:
+    with thread_lock:
         ga_solutions[key] = fitness
 
     return fitness

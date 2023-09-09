@@ -1,12 +1,11 @@
+from collections import defaultdict
 import random
 import threading
 import csv
 import ml
-from collections import defaultdict
-import sys
 
 # Define a lock for synchronization
-ga_solutions_lock = threading.Lock()
+thread_lock = threading.Lock()
 
 # Load and prepare data
 def load_csv(file_path):
@@ -24,7 +23,7 @@ def evaluate_fitness(solution, packets_1, packets_2, clf, ga_solutions):
     key = ''.join(map(str, solution))
 
     # Acquire the lock before reading ga_solutions
-    with ga_solutions_lock:
+    with thread_lock:
         if key in ga_solutions:
             return ga_solutions[key]
 
@@ -40,24 +39,20 @@ def evaluate_fitness(solution, packets_1, packets_2, clf, ga_solutions):
     fitness_2 = ml.classify(filtered_packets_2, filtered_packets_1, clf)
 
     average_accuracy = (fitness_1 + fitness_2) / 2.0
-
-    # Calculate feature accuracy
     num_selected_features = sum(solution)
     total_features = len(solution) - 1  # Excluding the class column
 
     feature_accuracy = 1 - ((num_selected_features - 1) / total_features)
 
-    # Calculate fitness as a weighted combination of average accuracy and feature accuracy
     fitness = 0.9 * average_accuracy + 0.1 * feature_accuracy
 
-    # Acquire the lock before updating ga_solutions
-    with ga_solutions_lock:
+    with thread_lock:
         ga_solutions[key] = fitness
 
     return fitness
 
 # Define the ACO algorithm
-def ant_colony_optimization(n_ants, n_iterations, pheromone_decay, pheromone_strength, lock, packets_1_location, packets_2_location, clf, solution_size, ga_solutions):
+def ant_colony_optimization(n_ants, n_iterations, pheromone_decay, pheromone_strength, packets_1_location, packets_2_location, clf, solution_size, ga_solutions):
     # Load the packets
     packets_1 = load_csv(packets_1_location)
     packets_2 = load_csv(packets_2_location)
@@ -67,14 +62,12 @@ def ant_colony_optimization(n_ants, n_iterations, pheromone_decay, pheromone_str
 
     # Define the ant behavior
     def ant_behavior(ant_index, solutions, fitness_values):
-        # Each ant chooses a solution based on the pheromone levels
-        # and the fitness function, and deposits pheromones accordingly
         solution = solutions[ant_index]
         fitness_value = fitness_values[ant_index]
-        lock.acquire()
-        pheromones[ant_index] += pheromone_strength * fitness_value  # Increase pheromone based on fitness
-        pheromones[ant_index] *= pheromone_decay  # Decay pheromone
-        lock.release()
+
+        with thread_lock:
+            pheromones[ant_index] += pheromone_strength * fitness_value  # Increase pheromone based on fitness
+            pheromones[ant_index] *= pheromone_decay  # Decay pheromone
 
     # Run the algorithm until the same best solution is produced 'n_iterations' times in a row
     best_solution_counter = 0
@@ -129,7 +122,6 @@ def run(packets_1_location, packets_2_location, clf):
     n_iterations = 10
     pheromone_strength = 1
     pheromone_decay = 0.5
-    lock = threading.Lock()
     ga_solutions = defaultdict(float)
 
     # Determine solution size (number of features)
@@ -137,4 +129,4 @@ def run(packets_1_location, packets_2_location, clf):
         first_line = file.readline()
     solution_size = len(first_line.split(',')) - 1
 
-    return ant_colony_optimization(n_ants, n_iterations, pheromone_decay, pheromone_strength, lock, packets_1_location, packets_2_location, clf, solution_size, ga_solutions)
+    return ant_colony_optimization(n_ants, n_iterations, pheromone_decay, pheromone_strength, packets_1_location, packets_2_location, clf, solution_size, ga_solutions)
