@@ -3,16 +3,37 @@ import random
 import threading
 import csv
 import ml
+import json
 
 # Define a lock for synchronization
 thread_lock = threading.Lock()
 
-# Load and prepare data
-def load_csv(file_path):
-    with open(file_path, 'r') as f:
-        reader = csv.reader(f)
-        data = [row for row in reader]
-    return data
+def load_csv(classes, fitness_function_file_path, n):
+    packets = []
+    for i in range(len(classes)):
+        print("reading from " + classes[str(i)] + "...")
+        with open(fitness_function_file_path, 'r', newline='') as csv_file:
+            csv_reader = csv.reader(csv_file)
+
+            # Skip the header row (if it exists)
+            next(csv_reader, None)
+
+            lines = []
+            # Iterate through the rows line by line
+            for row in csv_reader:
+                if row[-1] == str(i):
+                    lines.append(row)
+
+            random.shuffle(lines)
+
+            if n == 0:
+                no_of_packets_to_keep = len(lines)
+            else:
+                no_of_packets_to_keep = min(n, len(lines))
+
+            for i in range(no_of_packets_to_keep):
+                packets.append(lines[i])
+    return packets
 
 # Define the fitness function
 def evaluate_fitness(solution, packets_1, packets_2, clf, ga_solutions):
@@ -52,10 +73,27 @@ def evaluate_fitness(solution, packets_1, packets_2, clf, ga_solutions):
     return fitness
 
 # Define the ACO algorithm
-def ant_colony_optimization(n_ants, n_iterations, pheromone_decay, pheromone_strength, packets_1_location, packets_2_location, clf, solution_size, ga_solutions):
+def ant_colony_optimization(n_ants, n_iterations, pheromone_decay, pheromone_strength, fitness_function_file_paths, clf, solution_size, ga_solutions, classes_file_path, n):
+    # Load classes
+    with open(classes_file_path, 'r') as file:
+        classes = json.loads(file.readline())
+
     # Load the packets
-    packets_1 = load_csv(packets_1_location)
-    packets_2 = load_csv(packets_2_location)
+    print("loading packets...")
+    packets_1 = []
+    packets_2 = []
+
+    # Read header from CSV
+    with open(fitness_function_file_paths[0], 'r', newline='') as csv_file:
+        csv_reader = csv.reader(csv_file)
+        header = next(csv_reader)
+        packets_1.append(header)
+        packets_2.append(header)
+
+    packets_1.extend(element for element in load_csv(classes, fitness_function_file_paths[0], n))
+    packets_2.extend(element for element in load_csv(classes, fitness_function_file_paths[1], n))
+
+    print()
 
     # Initialize the pheromone matrix with equal values for each ant
     pheromones = [1.0] * n_ants
@@ -113,11 +151,12 @@ def ant_colony_optimization(n_ants, n_iterations, pheromone_decay, pheromone_str
 
         # Print current best solution with a grid of filled squares for 1 and empty squares for 0
         print(f"Generation {iteration_counter}:\t[{''.join(map(str, best_solution))}]\tFitness: {best_fitness}")
+    print()
 
     # Return the best solution and its fitness value
     return (best_solution, best_fitness)
 
-def run(packets_1_location, packets_2_location, clf):
+def run(fitness_function_file_paths, clf, classes_file_path, n):
     n_ants = 10
     n_iterations = 10
     pheromone_strength = 1
@@ -125,8 +164,8 @@ def run(packets_1_location, packets_2_location, clf):
     ga_solutions = defaultdict(float)
 
     # Determine solution size (number of features)
-    with open(packets_1_location, 'r') as file:
+    with open(fitness_function_file_paths[0], 'r') as file:
         first_line = file.readline()
     solution_size = len(first_line.split(',')) - 1
 
-    return ant_colony_optimization(n_ants, n_iterations, pheromone_decay, pheromone_strength, packets_1_location, packets_2_location, clf, solution_size, ga_solutions)
+    return ant_colony_optimization(n_ants, n_iterations, pheromone_decay, pheromone_strength, fitness_function_file_paths, clf, solution_size, ga_solutions, classes_file_path, n)

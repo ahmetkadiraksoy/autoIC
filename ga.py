@@ -5,16 +5,11 @@ import ml
 import concurrent.futures
 import os
 import threading
+import random
+import json
 
 # Define a lock for synchronization
 thread_lock = threading.Lock()
-
-# Load and prepare data
-def load_csv(file_path):
-    with open(file_path, 'r') as f:
-        reader = csv.reader(f)
-        data = [row for row in reader]
-    return data
 
 def initialize_population(pop_size, solution_size):
     # Initialize a population of random binary solutions
@@ -89,10 +84,71 @@ def mutate(solution, mutation_rate):
     mutated_solution = [bit ^ (random.random() < mutation_rate) for bit in solution]
     return mutated_solution
 
-def genetic_algorithm(pop_size, solution_size, num_generations, mutation_rate, crossover_rate, packets_1_location, packets_2_location, clf, ga_solutions, num_of_iterations):
+def randomize_packets(list_of_lists):
+    # Separate the first line (header) from the rest of the data
+    header = list_of_lists[0]
+    data = list_of_lists[1:]
+
+    # Shuffle the data portion (excluding the header)
+    random.shuffle(data)
+
+    # Combine the header and shuffled data to create the final randomized list
+    return [header] + data
+
+def load_csv(classes, fitness_function_file_path, n):
+    packets = []
+    for i in range(len(classes)):
+        print("reading from " + classes[str(i)] + "...")
+        with open(fitness_function_file_path, 'r', newline='') as csv_file:
+            csv_reader = csv.reader(csv_file)
+
+            # Skip the header row (if it exists)
+            next(csv_reader, None)
+
+            lines = []
+            # Iterate through the rows line by line
+            for row in csv_reader:
+                if row[-1] == str(i):
+                    lines.append(row)
+
+            random.shuffle(lines)
+
+            if n == 0:
+                no_of_packets_to_keep = len(lines)
+            else:
+                no_of_packets_to_keep = min(n, len(lines))
+
+            for i in range(no_of_packets_to_keep):
+                packets.append(lines[i])
+    return packets
+
+# def load_csv(file_path):
+#     with open(file_path, 'r') as f:
+#         reader = csv.reader(f)
+#         data = [row for row in reader]
+#     return data
+
+def genetic_algorithm(pop_size, solution_size, num_generations, mutation_rate, crossover_rate, fitness_function_file_paths, clf, ga_solutions, num_of_iterations, classes_file_path, n):
+    # Load classes
+    with open(classes_file_path, 'r') as file:
+        classes = json.loads(file.readline())
+
     # Load the packets
-    packets_1 = load_csv(packets_1_location)
-    packets_2 = load_csv(packets_2_location)
+    print("loading packets...")
+    packets_1 = []
+    packets_2 = []
+
+    # Read header from CSV
+    with open(fitness_function_file_paths[0], 'r', newline='') as csv_file:
+        csv_reader = csv.reader(csv_file)
+        header = next(csv_reader)
+        packets_1.append(header)
+        packets_2.append(header)
+
+    packets_1.extend(element for element in load_csv(classes, fitness_function_file_paths[0], n))
+    packets_2.extend(element for element in load_csv(classes, fitness_function_file_paths[1], n))
+
+    print()
 
     population = initialize_population(pop_size, solution_size)
     best_solution = None
@@ -138,13 +194,13 @@ def genetic_algorithm(pop_size, solution_size, num_generations, mutation_rate, c
             break
 
         generation += 1
-
+    print()
     key = ''.join(map(str, best_solution))
     best_fitness = ga_solutions[key]
 
     return best_solution, best_fitness
 
-def run(packets_1_location, packets_2_location, clf):
+def run(fitness_function_file_paths, clf, classes_file_path, n):
     # Example usage:
     population_size = 50
     num_generations = 100
@@ -154,8 +210,8 @@ def run(packets_1_location, packets_2_location, clf):
     ga_solutions = defaultdict(float)
 
     # Determine solution size (number of features)
-    with open(packets_1_location, 'r') as file:
+    with open(fitness_function_file_paths[0], 'r') as file:
         first_line = file.readline()
     solution_size = len(first_line.split(',')) - 1
 
-    return genetic_algorithm(population_size, solution_size, num_generations, mutation_rate, crossover_rate, packets_1_location, packets_2_location, clf, ga_solutions, num_of_iterations)
+    return genetic_algorithm(population_size, solution_size, num_generations, mutation_rate, crossover_rate, fitness_function_file_paths, clf, ga_solutions, num_of_iterations, classes_file_path, n)
