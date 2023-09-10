@@ -238,6 +238,11 @@ def main():
     num_of_packets_to_process = 0
     order_of_batches = [1,2,3]
     weights = [0.9,0.1]
+    filter_folder = os.path.join(os.path.dirname(__file__), "filters")
+
+    if not os.path.exists(filter_folder):
+        print("The 'filters' folder is missing")
+        sys.exit(1)
 
     # Loop through command-line arguments starting from the second element
     index = 1
@@ -275,16 +280,12 @@ def main():
                 folder = fix_trailing_character(sys.argv[index + 1])
                 index += 2  # Skip both the option and its value
                 pcap_folder = folder + "pcap"
-                filter_folder = folder + "filters"
 
                 if not os.path.exists(folder):
                     print(f"The folder {folder} is missing")
                     sys.exit(1)
                 elif not os.path.exists(pcap_folder):
                     print("The 'pcap' folder is missing")
-                    sys.exit(1)
-                elif not os.path.exists(filter_folder):
-                    print("The 'filters' folder is missing")
                     sys.exit(1)
                 elif len([f for f in os.listdir(pcap_folder) if f.endswith('.pcap')]) == 0:
                     print("There are not pcap files in the 'pcap' folder")
