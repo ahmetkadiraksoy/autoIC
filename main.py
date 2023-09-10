@@ -237,6 +237,7 @@ def main():
     num_of_iterations = 10
     num_of_packets_to_process = 0
     order_of_batches = [1,2,3]
+    weights = [0.9,0.1]
 
     # Loop through command-line arguments starting from the second element
     index = 1
@@ -254,6 +255,13 @@ def main():
                 index += 2  # Skip both the option and its value
             else:
                 print("Missing value for -o/--order option")
+                sys.exit(1)
+        elif sys.argv[index] in ('-w', '--weights'):
+            if index + 1 < len(sys.argv):
+                weights = [float(value) for value in sys.argv[index + 1].split(',')]
+                index += 2  # Skip both the option and its value
+            else:
+                print("Missing value for -w/--weights option")
                 sys.exit(1)
         elif sys.argv[index] in ('-n'):
             if index + 1 < len(sys.argv):
@@ -322,7 +330,7 @@ def main():
                 if sys.argv[index+1] == 'ga':
                     print("running GA...\n")
 
-                    best_solution, best_fitness = ga.run(fitness_function_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations)
+                    best_solution, best_fitness = ga.run(fitness_function_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations, weights)
 
                     print(f"Best Solution:\t[{''.join(map(str, best_solution))}]\tFitness: {best_fitness}")
                     print("\nSelected features:")
@@ -335,7 +343,7 @@ def main():
                 elif sys.argv[index+1] == 'aco':
                     print("running ACO...")
 
-                    best_solution, best_fitness = aco.run(fitness_function_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations)
+                    best_solution, best_fitness = aco.run(fitness_function_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations, weights)
 
                     print(f"Best Solution:\t[{''.join(map(str, best_solution))}]\tFitness: {best_fitness}")
                     print("\nSelected features:")
@@ -351,12 +359,12 @@ def main():
             else:
                 print("Missing value for -m/--mode option")
                 sys.exit(1)
-        elif sys.argv[index] in ('-c', '--classify'):
+        elif sys.argv[index] in ('-c', '--classifier'):
             if index + 1 < len(sys.argv):
                 classifier_index = int(sys.argv[index+1])
                 index += 2  # Skip both the option and its value
             else:
-                print("Missing value for -f/--folder option")
+                print("Missing value for -c/--classifier option")
                 sys.exit(1)
         else:
             print(f"Unknown parameter! '{sys.argv[index]}'")

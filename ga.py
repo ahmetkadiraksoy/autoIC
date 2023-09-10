@@ -55,7 +55,7 @@ def randomize_packets(list_of_lists):
     # Combine the header and shuffled data to create the final randomized list
     return [header] + data
 
-def genetic_algorithm(pop_size, solution_size, mutation_rate, crossover_rate, fitness_function_file_paths, classifier_index, pre_solutions, num_of_iterations, classes_file_path, num_of_packets_to_process):
+def genetic_algorithm(pop_size, solution_size, mutation_rate, crossover_rate, fitness_function_file_paths, classifier_index, pre_solutions, num_of_iterations, classes_file_path, num_of_packets_to_process, weights):
     # Load classes
     with open(classes_file_path, 'r') as file:
         classes = json.loads(file.readline())
@@ -104,7 +104,7 @@ def genetic_algorithm(pop_size, solution_size, mutation_rate, crossover_rate, fi
         num_cores = os.cpu_count() - 1 # Determine the number of CPU cores minus 1
         with concurrent.futures.ThreadPoolExecutor(max_workers=num_cores) as executor:
             for solution in population:
-                future = executor.submit(evaluate_fitness, solution, packets_1, packets_2, classifier_index, pre_solutions)
+                future = executor.submit(evaluate_fitness, solution, packets_1, packets_2, classifier_index, pre_solutions, weights)
                 fitness_scores.append(future.result())
 
         # Track and display the best solution in this generation
@@ -123,7 +123,7 @@ def genetic_algorithm(pop_size, solution_size, mutation_rate, crossover_rate, fi
 
     return best_solution, best_fitness
 
-def run(fitness_function_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations):
+def run(fitness_function_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations, weights):
     population_size = 50
     mutation_rate = 0.015
     crossover_rate = 0.5
@@ -134,4 +134,4 @@ def run(fitness_function_file_paths, classifier_index, classes_file_path, num_of
         first_line = file.readline()
     solution_size = len(first_line.split(',')) - 1
 
-    return genetic_algorithm(population_size, solution_size, mutation_rate, crossover_rate, fitness_function_file_paths, classifier_index, pre_solutions, num_of_iterations, classes_file_path, num_of_packets_to_process)
+    return genetic_algorithm(population_size, solution_size, mutation_rate, crossover_rate, fitness_function_file_paths, classifier_index, pre_solutions, num_of_iterations, classes_file_path, num_of_packets_to_process, weights)

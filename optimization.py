@@ -2,11 +2,12 @@ import threading
 import ml
 import csv
 import random
+import numpy as np
 
 # Define a lock for synchronization
 thread_lock = threading.Lock()
 
-def evaluate_fitness(solution, packets_1, packets_2, classifier_index, pre_solutions):
+def evaluate_fitness(solution, packets_1, packets_2, classifier_index, pre_solutions, weights):
     # If no features are to be selected
     if sum(solution) == 0:
         return 0.0
@@ -19,8 +20,7 @@ def evaluate_fitness(solution, packets_1, packets_2, classifier_index, pre_solut
             return pre_solutions[key]
 
     # Append 1 to the end so that it doesn't filter out the 'class' column
-    solution_new = list(solution)
-    solution_new.append(1)
+    solution_new = solution + [1]
 
     # Filter features
     filtered_packets_1 = [[col for col, m in zip(row, solution_new) if m] for row in packets_1]
@@ -29,7 +29,7 @@ def evaluate_fitness(solution, packets_1, packets_2, classifier_index, pre_solut
     fitness_1 = ml.classify(filtered_packets_1, filtered_packets_2, classifier_index)
     fitness_2 = ml.classify(filtered_packets_2, filtered_packets_1, classifier_index)
 
-    average_accuracy = (fitness_1 + fitness_2) / 2.0
+    average_accuracy = np.mean([fitness_1, fitness_2])
 
     # Calculate feature accuracy
     num_selected_features = sum(solution)
@@ -38,7 +38,7 @@ def evaluate_fitness(solution, packets_1, packets_2, classifier_index, pre_solut
     feature_accuracy = 1 - ((num_selected_features - 1) / total_features)
 
     # Calculate fitness as a weighted combination of average accuracy and feature accuracy
-    fitness = 0.9 * average_accuracy + 0.1 * feature_accuracy
+    fitness = weights[0] * average_accuracy + weights[1] * feature_accuracy
 
     # Acquire the lock before updating pre_solutions
     with thread_lock:
