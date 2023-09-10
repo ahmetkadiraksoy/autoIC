@@ -35,8 +35,7 @@ def ant_colony_optimization(num_of_ants, num_of_iterations, pheromone_decay, phe
     pheromones = [1.0] * num_of_ants
 
     # Define the ant behavior
-    def ant_behavior(ant_index, solutions, fitness_values):
-        solution = solutions[ant_index]
+    def ant_behavior(ant_index, fitness_values):
         fitness_value = fitness_values[ant_index]
 
         with thread_lock:
@@ -48,7 +47,6 @@ def ant_colony_optimization(num_of_ants, num_of_iterations, pheromone_decay, phe
     iteration_counter = 0
     best_solution = None
     best_fitness = None
-    best_ones = None
 
     while best_solution_counter + 1 < num_of_iterations:
         threads = []
@@ -57,10 +55,9 @@ def ant_colony_optimization(num_of_ants, num_of_iterations, pheromone_decay, phe
 
         current_best_solution = None
         current_best_fitness = None
-        current_best_ones = None
 
         for j in range(num_of_ants):
-            t = threading.Thread(target=ant_behavior, args=(j, solutions, fitness_values))
+            t = threading.Thread(target=ant_behavior, args=(j, fitness_values))
             threads.append(t)
             t.start()
 
@@ -71,14 +68,12 @@ def ant_colony_optimization(num_of_ants, num_of_iterations, pheromone_decay, phe
         ant_fitness_max_index = fitness_values.index(max(fitness_values))
         current_best_solution = solutions[ant_fitness_max_index]
         current_best_fitness = evaluate_fitness(current_best_solution, packets_1, packets_2, classifier_index, pre_solutions)
-        current_best_ones = sum(current_best_solution)
 
         # If the current best solution is better than the previous best solution,
         # update the best solution and best fitness
         if best_solution is None or current_best_fitness > evaluate_fitness(best_solution, packets_1, packets_2, classifier_index, pre_solutions):
             best_solution = current_best_solution
             best_fitness = current_best_fitness
-            best_ones = current_best_ones
             best_solution_counter = 0
         else:
             best_solution_counter += 1
