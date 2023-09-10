@@ -1,7 +1,4 @@
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.svm import SVC
-from sklearn.neural_network import MLPClassifier
+import pandas as pd
 import subprocess
 import csv
 import sys
@@ -11,9 +8,7 @@ import ga
 import ml
 import aco
 import json
-import pandas as pd
-
-MAX_32BIT_INT = 2 ** 32
+import pyshark
 
 def is_numeric(input_string):
     try:
@@ -24,10 +19,7 @@ def is_numeric(input_string):
 
 def is_hexadecimal(s):
     pattern = r"^[0-9A-Fa-f]+$"
-    if re.match(pattern, s):
-        return True
-    else:
-        return False
+    return bool(re.match(pattern, s))
 
 def calculate_list_average(lst):
     return sum(lst) / len(lst) if lst else 0
@@ -39,15 +31,69 @@ def load_csv(file_path):
     return data
 
 def fix_trailing_character(input_string):
-    if not input_string.endswith('/'):
-        return input_string + '/'
-    return input_string
+    return input_string.rstrip('/') + '/'
 
 def remove_duplicates_list_list(input_list):
     return [list(t) for t in set(tuple(row) for row in input_list)]
 
 def remove_rows_with_nan(csv_data):
     return [list(row) for row in csv_data if not all(entry == "" for entry in row[:-1])]
+
+def modify_dataset(csv_data):
+    for i in range(len(csv_data)):
+        for j in range(len(csv_data[i]) - 1):
+            cell = csv_data[i][j]
+
+            # If the cell is empty, replace it with 'NaN'
+            if len(cell) == 0:
+                csv_data[i][j] = 'NaN'
+            else:
+                tokens = cell.split(',')
+                total = 0
+
+                # Loop through tokens in the cell
+                for token in tokens:
+                    if token.startswith("0x"):  # Hexadecimal
+                        # Convert hexadecimal to decimal
+                        decimal_value = int(token, 16)
+                        token = str(decimal_value)
+                    elif not is_numeric(token.replace(',', '')):  # Alphanumeric
+                        # Calculate the hash value using the hash() function
+                        decimal_hash = hash(token)
+                        token = str(decimal_hash)
+                    
+                    # Sum up the numeric values
+                    total += float(token)
+                
+                # Replace the cell value with the remainder modulo a large constant
+                csv_data[i][j] = str(total % 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)
+
+def extract_fields_from_pcap(pcap_file_path, field_names):
+    # Initialize a list to store the extracted data
+    extracted_data = []
+
+    # Create a FileCapture object to read the PCAP file
+    capture = pyshark.FileCapture(pcap_file_path)
+
+    # Iterate through each packet in the PCAP file
+    for packet in capture:
+        packet_data = []
+        for field_name in field_names:
+            try:
+                # Extract the value of the specified field from the packet
+                field_value = packet[field_name].value
+                packet_data.append(field_value)
+            except AttributeError:
+                # Handle the case where the field doesn't exist in the packet
+                packet_data.append(None)
+
+        # Append the extracted data for this packet to the list
+        extracted_data.append(packet_data)
+
+    # Close the capture file
+    capture.close()
+
+    return extracted_data
 
 def extract_features_from_pcap(blacklist_file_path, feature_names_file_path, protocol_folder_path, csv_file_paths, pcap_file_names, pcap_file_paths, classes_file_path, selected_field_list_file_path):
     # Create protocol folder
@@ -109,33 +155,7 @@ def extract_features_from_pcap(blacklist_file_path, feature_names_file_path, pro
         csv_data = remove_rows_with_nan(csv_data)
 
         # Modify dataset
-        for i in range(len(csv_data)):
-            for j in range(len(csv_data[i]) - 1):
-                cell = csv_data[i][j]
-
-                # If the cell is empty, replace it with 'NaN'
-                if len(cell) == 0:
-                    csv_data[i][j] = 'NaN'
-                else:
-                    tokens = cell.split(',')
-                    total = 0
-
-                    # Loop through tokens in the cell
-                    for token in tokens:
-                        if token.startswith("0x"):  # Hexadecimal
-                            # Convert hexadecimal to decimal
-                            decimal_value = int(token, 16)
-                            token = str(decimal_value)
-                        elif not is_numeric(token.replace(',', '')):  # Alphanumeric
-                            # Calculate the hash value using the hash() function
-                            decimal_hash = hash(token)
-                            token = str(decimal_hash)
-                        
-                        # Sum up the numeric values
-                        total += float(token)
-                    
-                    # Replace the cell value with the remainder modulo a large constant
-                    csv_data[i][j] = str(total % 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)
+        modify_dataset(csv_data)
 
         # Calculate the number of lines per file
         lines_per_file = len(csv_data) // 3
@@ -200,14 +220,6 @@ def main():
         print("Usage: python script.py arg1 arg2...")
         sys.exit(1)
 
-    # List of classifiers to test
-    classifiers = [
-        DecisionTreeClassifier(),
-        RandomForestClassifier(),
-        SVC(),
-        MLPClassifier(hidden_layer_sizes=(100, 50), max_iter=1000, random_state=42)
-    ]
-
     classifier_index = 0
     folder = ""
     protocol = ""
@@ -222,7 +234,9 @@ def main():
     pcap_file_paths = []
     fitness_function_file_paths = []
     selected_field_list = []
-    n = 0
+    num_of_iterations = 10
+    num_of_packets_to_process = 0
+    order_of_batches = [1,2,3]
 
     # Loop through command-line arguments starting from the second element
     index = 1
@@ -234,9 +248,16 @@ def main():
             else:
                 print("Missing value for -p/--protocol option")
                 sys.exit(1)
+        elif sys.argv[index] in ('-o', '--order'):
+            if index + 1 < len(sys.argv):
+                order_of_batches = sys.argv[index + 1].split(',')
+                index += 2  # Skip both the option and its value
+            else:
+                print("Missing value for -o/--order option")
+                sys.exit(1)
         elif sys.argv[index] in ('-n'):
             if index + 1 < len(sys.argv):
-                n = int(sys.argv[index + 1])
+                num_of_packets_to_process = int(sys.argv[index + 1])
                 index += 2  # Skip both the option and its value
             else:
                 print("Missing value for -n option")
@@ -289,9 +310,9 @@ def main():
                 sys.exit(1)
 
             if index + 1 < len(sys.argv):
-                fitness_function_file_paths.append(folder + protocol + '/batch_1.csv')
-                fitness_function_file_paths.append(folder + protocol + '/batch_2.csv')
-                test_file_path = folder + protocol + '/batch_3.csv'
+                fitness_function_file_paths.append(f'{folder}{protocol}/batch_{order_of_batches[0]}.csv')
+                fitness_function_file_paths.append(f'{folder}{protocol}/batch_{order_of_batches[1]}.csv')
+                test_file_path = f'{folder}{protocol}/batch_{order_of_batches[2]}.csv'
                 selected_field_list_file_path = f'{folder}/{protocol}/fields.txt'
                 classes_file_path = f'{folder}/{protocol}/classes.json'
 
@@ -301,7 +322,7 @@ def main():
                 if sys.argv[index+1] == 'ga':
                     print("running GA...\n")
 
-                    best_solution, best_fitness = ga.run(fitness_function_file_paths, classifiers[classifier_index], classes_file_path, n)
+                    best_solution, best_fitness = ga.run(fitness_function_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations)
 
                     print(f"Best Solution:\t[{''.join(map(str, best_solution))}]\tFitness: {best_fitness}")
                     print("\nSelected features:")
@@ -310,11 +331,11 @@ def main():
                             print(selected_field_list[i])
 
                     print()
-                    print("Accuracy:", ml.classify_after_filtering(best_solution, fitness_function_file_paths, test_file_path, classifiers[classifier_index]))
+                    print("Accuracy:", ml.classify_after_filtering(best_solution, fitness_function_file_paths, test_file_path, classifier_index))
                 elif sys.argv[index+1] == 'aco':
                     print("running ACO...")
 
-                    best_solution, best_fitness = aco.run(fitness_function_file_paths, classifiers[classifier_index], classes_file_path, n)
+                    best_solution, best_fitness = aco.run(fitness_function_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations)
 
                     print(f"Best Solution:\t[{''.join(map(str, best_solution))}]\tFitness: {best_fitness}")
                     print("\nSelected features:")
@@ -323,7 +344,7 @@ def main():
                             print(selected_field_list[i])
 
                     print()
-                    print("Accuracy:", ml.classify_after_filtering(best_solution, fitness_function_file_paths, test_file_path, classifiers[classifier_index]))
+                    print("Accuracy:", ml.classify_after_filtering(best_solution, fitness_function_file_paths, test_file_path, classifier_index))
                 else:
                     print("Unknown entry for the mode")
                 index += 2  # Skip both the option and its value

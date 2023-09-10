@@ -1,7 +1,7 @@
 from collections import defaultdict
+from optimization import load_csv, evaluate_fitness
 import random
 import csv
-import ml
 import concurrent.futures
 import os
 import threading
@@ -18,46 +18,6 @@ def initialize_population(pop_size, solution_size):
         solution = [random.choice([0, 1]) for _ in range(solution_size)]
         population.append(solution)
     return population
-
-def evaluate_fitness(solution, packets_1, packets_2, clf, ga_solutions):
-    # If no features are to be selected
-    if sum(solution) == 0:
-        return 0.0
-
-    key = ''.join(map(str, solution))
-
-    # Acquire the lock before reading ga_solutions
-    with thread_lock:
-        if key in ga_solutions:
-            return ga_solutions[key]
-
-    # Append 1 to the end so that it doesn't filter out the 'class' column
-    solution_new = list(solution)
-    solution_new.append(1)
-
-    # Filter features
-    filtered_packets_1 = [[col for col, m in zip(row, solution_new) if m] for row in packets_1]
-    filtered_packets_2 = [[col for col, m in zip(row, solution_new) if m] for row in packets_2]
-    
-    fitness_1 = ml.classify(filtered_packets_1, filtered_packets_2, clf)
-    fitness_2 = ml.classify(filtered_packets_2, filtered_packets_1, clf)
-
-    average_accuracy = (fitness_1 + fitness_2) / 2.0
-
-    # Calculate feature accuracy
-    num_selected_features = sum(solution)
-    total_features = len(solution) - 1  # Excluding the class column
-
-    feature_accuracy = 1 - ((num_selected_features - 1) / total_features)
-
-    # Calculate fitness as a weighted combination of average accuracy and feature accuracy
-    fitness = 0.9 * average_accuracy + 0.1 * feature_accuracy
-
-    # Acquire the lock before updating ga_solutions
-    with thread_lock:
-        ga_solutions[key] = fitness
-
-    return fitness
 
 def select_parents(population, fitness_scores):
     # Implement Elitism: Select parents based on fitness (roulette wheel selection)
@@ -95,40 +55,7 @@ def randomize_packets(list_of_lists):
     # Combine the header and shuffled data to create the final randomized list
     return [header] + data
 
-def load_csv(classes, fitness_function_file_path, n):
-    packets = []
-    for i in range(len(classes)):
-        print("reading from " + classes[str(i)] + "...")
-        with open(fitness_function_file_path, 'r', newline='') as csv_file:
-            csv_reader = csv.reader(csv_file)
-
-            # Skip the header row (if it exists)
-            next(csv_reader, None)
-
-            lines = []
-            # Iterate through the rows line by line
-            for row in csv_reader:
-                if row[-1] == str(i):
-                    lines.append(row)
-
-            random.shuffle(lines)
-
-            if n == 0:
-                no_of_packets_to_keep = len(lines)
-            else:
-                no_of_packets_to_keep = min(n, len(lines))
-
-            for i in range(no_of_packets_to_keep):
-                packets.append(lines[i])
-    return packets
-
-# def load_csv(file_path):
-#     with open(file_path, 'r') as f:
-#         reader = csv.reader(f)
-#         data = [row for row in reader]
-#     return data
-
-def genetic_algorithm(pop_size, solution_size, num_generations, mutation_rate, crossover_rate, fitness_function_file_paths, clf, ga_solutions, num_of_iterations, classes_file_path, n):
+def genetic_algorithm(pop_size, solution_size, mutation_rate, crossover_rate, fitness_function_file_paths, classifier_index, pre_solutions, num_of_iterations, classes_file_path, num_of_packets_to_process):
     # Load classes
     with open(classes_file_path, 'r') as file:
         classes = json.loads(file.readline())
@@ -145,8 +72,8 @@ def genetic_algorithm(pop_size, solution_size, num_generations, mutation_rate, c
         packets_1.append(header)
         packets_2.append(header)
 
-    packets_1.extend(element for element in load_csv(classes, fitness_function_file_paths[0], n))
-    packets_2.extend(element for element in load_csv(classes, fitness_function_file_paths[1], n))
+    packets_1.extend(element for element in load_csv(classes, fitness_function_file_paths[0], num_of_packets_to_process))
+    packets_2.extend(element for element in load_csv(classes, fitness_function_file_paths[1], num_of_packets_to_process))
 
     print()
 
@@ -156,7 +83,7 @@ def genetic_algorithm(pop_size, solution_size, num_generations, mutation_rate, c
     consecutive_same_solution_count = 0
     generation = 1
 
-    while generation <= num_generations:
+    while consecutive_same_solution_count < num_of_iterations:
         if best_solution is not None:
             # Select parents for reproduction using Elitism
             parents = select_parents(population, fitness_scores)
@@ -177,7 +104,7 @@ def genetic_algorithm(pop_size, solution_size, num_generations, mutation_rate, c
         num_cores = os.cpu_count() - 1 # Determine the number of CPU cores minus 1
         with concurrent.futures.ThreadPoolExecutor(max_workers=num_cores) as executor:
             for solution in population:
-                future = executor.submit(evaluate_fitness, solution, packets_1, packets_2, clf, ga_solutions)
+                future = executor.submit(evaluate_fitness, solution, packets_1, packets_2, classifier_index, pre_solutions)
                 fitness_scores.append(future.result())
 
         # Track and display the best solution in this generation
@@ -189,29 +116,22 @@ def genetic_algorithm(pop_size, solution_size, num_generations, mutation_rate, c
             consecutive_same_solution_count = 0
         print(f"Generation {generation}:\t[{''.join(map(str, best_solution))}]\tFitness: {max(fitness_scores)}")
         
-        # Terminate if the same solution has been observed consecutively for a specified number of times
-        if consecutive_same_solution_count >= num_of_iterations:
-            break
-
         generation += 1
     print()
     key = ''.join(map(str, best_solution))
-    best_fitness = ga_solutions[key]
+    best_fitness = pre_solutions[key]
 
     return best_solution, best_fitness
 
-def run(fitness_function_file_paths, clf, classes_file_path, n):
-    # Example usage:
+def run(fitness_function_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations):
     population_size = 50
-    num_generations = 100
     mutation_rate = 0.015
     crossover_rate = 0.5
-    num_of_iterations = 10
-    ga_solutions = defaultdict(float)
+    pre_solutions = defaultdict(float)
 
     # Determine solution size (number of features)
     with open(fitness_function_file_paths[0], 'r') as file:
         first_line = file.readline()
     solution_size = len(first_line.split(',')) - 1
 
-    return genetic_algorithm(population_size, solution_size, num_generations, mutation_rate, crossover_rate, fitness_function_file_paths, clf, ga_solutions, num_of_iterations, classes_file_path, n)
+    return genetic_algorithm(population_size, solution_size, mutation_rate, crossover_rate, fitness_function_file_paths, classifier_index, pre_solutions, num_of_iterations, classes_file_path, num_of_packets_to_process)

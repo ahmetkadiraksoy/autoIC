@@ -1,6 +1,9 @@
 from sklearn.metrics import f1_score
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.svm import SVC
+from sklearn.neural_network import MLPClassifier
 import csv
-import sys
 
 def load_csv(file_path):
     with open(file_path, 'r') as f:
@@ -28,7 +31,16 @@ def remove_duplicates_list_list(list_of_lists):
     # Now, 'result' contains the unique sublists with the first occurrence in place
     return result
 
-def train_and_evaluate_classifier(clf, train_features, train_labels, test_features, test_labels):
+def train_and_evaluate_classifier(classifier_index, train_features, train_labels, test_features, test_labels):
+    # List of classifiers to test
+    classifiers = [
+        DecisionTreeClassifier(),
+        RandomForestClassifier(),
+        SVC(),
+        MLPClassifier(hidden_layer_sizes=(100, 50), max_iter=1000, random_state=42)
+    ]
+
+    clf = classifiers[classifier_index]
     clf.fit(train_features, train_labels)
     predictions = clf.predict(test_features)
     return f1_score(test_labels, predictions, average='weighted')
@@ -38,7 +50,7 @@ def extract_features_and_labels(data, label_column_index):
     labels = [row[label_column_index] for row in data]
     return features, labels
 
-def classify(train, test, clf):
+def classify(train, test, classifier_index):
     try:
         # Extract header and data separately
         train_header, train_data = train[0], train[1:]
@@ -52,11 +64,11 @@ def classify(train, test, clf):
         test_features, test_labels = extract_features_and_labels(test_data, label_column_index)
 
         # Train and evaluate the classifier
-        return train_and_evaluate_classifier(clf, train_features, train_labels, test_features, test_labels)
+        return train_and_evaluate_classifier(classifier_index, train_features, train_labels, test_features, test_labels)
     except ValueError as e:
         print(f"Error: {e}")
 
-def classify_after_filtering(solution, fitness_function_file_paths, test_file_path, clf):
+def classify_after_filtering(solution, fitness_function_file_paths, test_file_path, classifier_index):
     # Append 1 to the end so that it doesn't filter out the 'class' column
     solution_new = list(solution)
     solution_new.append(1)
@@ -72,4 +84,4 @@ def classify_after_filtering(solution, fitness_function_file_paths, test_file_pa
     filtered_packets_train = [[col for col, m in zip(row, solution_new) if m] for row in train]
     filtered_packets_test = [[col for col, m in zip(row, solution_new) if m] for row in test]
 
-    return classify(filtered_packets_train, filtered_packets_test, clf)
+    return classify(filtered_packets_train, filtered_packets_test, classifier_index)

@@ -1,79 +1,15 @@
 from collections import defaultdict
+from optimization import load_csv, evaluate_fitness
 import random
 import threading
 import csv
-import ml
 import json
 
 # Define a lock for synchronization
 thread_lock = threading.Lock()
 
-def load_csv(classes, fitness_function_file_path, n):
-    packets = []
-    for i in range(len(classes)):
-        print("reading from " + classes[str(i)] + "...")
-        with open(fitness_function_file_path, 'r', newline='') as csv_file:
-            csv_reader = csv.reader(csv_file)
-
-            # Skip the header row (if it exists)
-            next(csv_reader, None)
-
-            lines = []
-            # Iterate through the rows line by line
-            for row in csv_reader:
-                if row[-1] == str(i):
-                    lines.append(row)
-
-            random.shuffle(lines)
-
-            if n == 0:
-                no_of_packets_to_keep = len(lines)
-            else:
-                no_of_packets_to_keep = min(n, len(lines))
-
-            for i in range(no_of_packets_to_keep):
-                packets.append(lines[i])
-    return packets
-
-# Define the fitness function
-def evaluate_fitness(solution, packets_1, packets_2, clf, ga_solutions):
-    # If no features are to be selected
-    if sum(solution) == 0:
-        return 0.0
-
-    key = ''.join(map(str, solution))
-
-    # Acquire the lock before reading ga_solutions
-    with thread_lock:
-        if key in ga_solutions:
-            return ga_solutions[key]
-
-    # Append 1 to the end so that it doesn't filter out the 'class' column
-    solution_new = list(solution)
-    solution_new.append(1)
-
-    # Filter features
-    filtered_packets_1 = [[col for col, m in zip(row, solution_new) if m] for row in packets_1]
-    filtered_packets_2 = [[col for col, m in zip(row, solution_new) if m] for row in packets_2]
-    
-    fitness_1 = ml.classify(filtered_packets_1, filtered_packets_2, clf)
-    fitness_2 = ml.classify(filtered_packets_2, filtered_packets_1, clf)
-
-    average_accuracy = (fitness_1 + fitness_2) / 2.0
-    num_selected_features = sum(solution)
-    total_features = len(solution) - 1  # Excluding the class column
-
-    feature_accuracy = 1 - ((num_selected_features - 1) / total_features)
-
-    fitness = 0.9 * average_accuracy + 0.1 * feature_accuracy
-
-    with thread_lock:
-        ga_solutions[key] = fitness
-
-    return fitness
-
 # Define the ACO algorithm
-def ant_colony_optimization(n_ants, n_iterations, pheromone_decay, pheromone_strength, fitness_function_file_paths, clf, solution_size, ga_solutions, classes_file_path, n):
+def ant_colony_optimization(num_of_ants, num_of_iterations, pheromone_decay, pheromone_strength, fitness_function_file_paths, classifier_index, solution_size, pre_solutions, classes_file_path, num_of_packets_to_process):
     # Load classes
     with open(classes_file_path, 'r') as file:
         classes = json.loads(file.readline())
@@ -90,13 +26,13 @@ def ant_colony_optimization(n_ants, n_iterations, pheromone_decay, pheromone_str
         packets_1.append(header)
         packets_2.append(header)
 
-    packets_1.extend(element for element in load_csv(classes, fitness_function_file_paths[0], n))
-    packets_2.extend(element for element in load_csv(classes, fitness_function_file_paths[1], n))
+    packets_1.extend(element for element in load_csv(classes, fitness_function_file_paths[0], num_of_packets_to_process))
+    packets_2.extend(element for element in load_csv(classes, fitness_function_file_paths[1], num_of_packets_to_process))
 
     print()
 
     # Initialize the pheromone matrix with equal values for each ant
-    pheromones = [1.0] * n_ants
+    pheromones = [1.0] * num_of_ants
 
     # Define the ant behavior
     def ant_behavior(ant_index, solutions, fitness_values):
@@ -114,16 +50,16 @@ def ant_colony_optimization(n_ants, n_iterations, pheromone_decay, pheromone_str
     best_fitness = None
     best_ones = None
 
-    while best_solution_counter + 1 < n_iterations:
+    while best_solution_counter + 1 < num_of_iterations:
         threads = []
-        solutions = [[random.randint(0, 1) for _ in range(solution_size)] for _ in range(n_ants)]
-        fitness_values = [evaluate_fitness(s, packets_1, packets_2, clf, ga_solutions) for s in solutions]
+        solutions = [[random.randint(0, 1) for _ in range(solution_size)] for _ in range(num_of_ants)]
+        fitness_values = [evaluate_fitness(s, packets_1, packets_2, classifier_index, pre_solutions) for s in solutions]
 
         current_best_solution = None
         current_best_fitness = None
         current_best_ones = None
 
-        for j in range(n_ants):
+        for j in range(num_of_ants):
             t = threading.Thread(target=ant_behavior, args=(j, solutions, fitness_values))
             threads.append(t)
             t.start()
@@ -134,12 +70,12 @@ def ant_colony_optimization(n_ants, n_iterations, pheromone_decay, pheromone_str
         # Choose the best solution based on the fitness values
         ant_fitness_max_index = fitness_values.index(max(fitness_values))
         current_best_solution = solutions[ant_fitness_max_index]
-        current_best_fitness = evaluate_fitness(current_best_solution, packets_1, packets_2, clf, ga_solutions)
+        current_best_fitness = evaluate_fitness(current_best_solution, packets_1, packets_2, classifier_index, pre_solutions)
         current_best_ones = sum(current_best_solution)
 
         # If the current best solution is better than the previous best solution,
         # update the best solution and best fitness
-        if best_solution is None or current_best_fitness > evaluate_fitness(best_solution, packets_1, packets_2, clf, ga_solutions):
+        if best_solution is None or current_best_fitness > evaluate_fitness(best_solution, packets_1, packets_2, classifier_index, pre_solutions):
             best_solution = current_best_solution
             best_fitness = current_best_fitness
             best_ones = current_best_ones
@@ -156,16 +92,15 @@ def ant_colony_optimization(n_ants, n_iterations, pheromone_decay, pheromone_str
     # Return the best solution and its fitness value
     return (best_solution, best_fitness)
 
-def run(fitness_function_file_paths, clf, classes_file_path, n):
-    n_ants = 10
-    n_iterations = 10
+def run(fitness_function_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations):
+    num_of_ants = 10
     pheromone_strength = 1
     pheromone_decay = 0.5
-    ga_solutions = defaultdict(float)
+    pre_solutions = defaultdict(float)
 
     # Determine solution size (number of features)
     with open(fitness_function_file_paths[0], 'r') as file:
         first_line = file.readline()
     solution_size = len(first_line.split(',')) - 1
 
-    return ant_colony_optimization(n_ants, n_iterations, pheromone_decay, pheromone_strength, fitness_function_file_paths, clf, solution_size, ga_solutions, classes_file_path, n)
+    return ant_colony_optimization(num_of_ants, num_of_iterations, pheromone_decay, pheromone_strength, fitness_function_file_paths, classifier_index, solution_size, pre_solutions, classes_file_path, num_of_packets_to_process)
