@@ -75,7 +75,7 @@ def modify_dataset(csv_data):
                     total += float(token)
                 
                 # Replace the cell value with the remainder modulo a large constant
-                csv_data[i][j] = str(total % 0xFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF)
+                csv_data[i][j] = str(total % 0xFFFFFFFF)
 
 # Function to read blacklisted features from a file
 def read_blacklisted_features(blacklist_file_path):
