@@ -1,3 +1,5 @@
+from sklearn.metrics import classification_report
+from libraries import log
 import pandas as pd
 import subprocess
 import csv
@@ -230,6 +232,7 @@ def main():
     protocol_folder_path = ""
     classes_file_path = ""
     selected_field_list_file_path = ""
+    log_file_name = "log.txt"
     csv_file_paths = []
     pcap_file_names = []
     pcap_file_paths = []
@@ -295,6 +298,14 @@ def main():
             else:
                 print("Missing value for -f/--folder option")
                 sys.exit(1)
+        elif sys.argv[index] in ('-l', '--log'):
+            if index + 1 < len(sys.argv):
+                log_file_name = sys.argv[index + 1]
+
+                index += 2  # Skip both the option and its value
+            else:
+                print("Missing value for -f/--folder option")
+                sys.exit(1)
         elif sys.argv[index] in ('-e', '--extract'):
             if folder == "" or protocol == "":
                 print("Incorrect parameter order given!")
@@ -324,6 +335,7 @@ def main():
                 fitness_function_file_paths.append(f'{folder}{protocol}/batch_{order_of_batches[1]}.csv')
                 test_file_path = f'{folder}{protocol}/batch_{order_of_batches[2]}.csv'
                 selected_field_list_file_path = f'{folder}/{protocol}/fields.txt'
+                log_file_path = f'{folder}/{protocol}/{log_file_name}'
                 classes_file_path = f'{folder}/{protocol}/classes.json'
 
                 with open(selected_field_list_file_path, 'r') as file:
@@ -345,26 +357,38 @@ def main():
             print(f"Unknown parameter! '{sys.argv[index]}'")
             sys.exit(1)
 
+    # Create the log file
+    if os.path.exists(log_file_path):
+        os.remove(log_file_path)
+    with open(log_file_path, 'w') as file:
+        pass
+
     # Run the mode
     if mode == 'extract':
         print("converting pcap files to csv format...\n")
         extract_features_from_pcap(blacklist_file_path, feature_names_file_path, protocol_folder_path, csv_file_paths, pcap_file_names, pcap_file_paths, classes_file_path, selected_field_list_file_path)
     elif mode == 'ga':
-        print("running GA...\n")
-        best_solution, best_fitness = ga.run(fitness_function_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations, weights)
+        log("running GA...", log_file_path)
+        best_solution, best_fitness = ga.run(fitness_function_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations, weights, log_file_path)
     elif mode == 'aco':
-        print("running ACO...")
-        best_solution, best_fitness = aco.run(fitness_function_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations, weights)
+        log("running ACO...", log_file_path)
+        best_solution, best_fitness = aco.run(fitness_function_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations, weights, log_file_path)
     else:
         print("Unknown entry for the mode")
 
     # Print results
     if mode == 'ga' or mode == 'aco':
-        print(f"Best Solution:\t[{''.join(map(str, best_solution))}]\tFitness: {best_fitness}")
-        print("\nSelected features:")
+        log(f"Best Solution:\t[{''.join(map(str, best_solution))}]\tFitness: {best_fitness}", log_file_path)
+        log("\nSelected features:", log_file_path)
         for i in range(len(best_solution)):
             if best_solution[i] == 1:
-                print(selected_field_list[i])
-        print("\nAccuracy:", ml.classify_after_filtering(best_solution, fitness_function_file_paths, test_file_path, classifier_index))
+                log(selected_field_list[i], log_file_path)
+        f1_score_average, predictions, test_labels = ml.classify_after_filtering(best_solution, fitness_function_file_paths, test_file_path, classifier_index)
+
+        log("\nAccuracy: " + str(f1_score_average), log_file_path)
+
+        # You can also print a classification report for more detailed metrics
+        log("\nClassification Report:", log_file_path)
+        log(classification_report(test_labels, predictions, zero_division=0), log_file_path)
 
 main()

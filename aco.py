@@ -1,5 +1,6 @@
 from collections import defaultdict
 from optimization import load_csv, evaluate_fitness
+from libraries import log
 import random
 import threading
 import csv
@@ -9,7 +10,7 @@ import json
 thread_lock = threading.Lock()
 
 # Define the ACO algorithm
-def ant_colony_optimization(num_of_ants, num_of_iterations, pheromone_decay, pheromone_strength, fitness_function_file_paths, classifier_index, solution_size, pre_solutions, classes_file_path, num_of_packets_to_process, weights):
+def ant_colony_optimization(num_of_ants, num_of_iterations, pheromone_decay, pheromone_strength, fitness_function_file_paths, classifier_index, solution_size, pre_solutions, classes_file_path, num_of_packets_to_process, weights, log_file_path):
     # Load classes
     with open(classes_file_path, 'r') as file:
         classes = json.loads(file.readline())
@@ -29,7 +30,7 @@ def ant_colony_optimization(num_of_ants, num_of_iterations, pheromone_decay, phe
     packets_1.extend(element for element in load_csv(classes, fitness_function_file_paths[0], num_of_packets_to_process))
     packets_2.extend(element for element in load_csv(classes, fitness_function_file_paths[1], num_of_packets_to_process))
 
-    print()
+    log("", log_file_path)
 
     # Initialize the pheromone matrix with equal values for each ant
     pheromones = [1.0] * num_of_ants
@@ -81,13 +82,13 @@ def ant_colony_optimization(num_of_ants, num_of_iterations, pheromone_decay, phe
         iteration_counter += 1
 
         # Print current best solution with a grid of filled squares for 1 and empty squares for 0
-        print(f"Generation {iteration_counter}:\t[{''.join(map(str, best_solution))}]\tFitness: {best_fitness}")
-    print()
+        log(f"Generation {iteration_counter}:\t[{''.join(map(str, best_solution))}]\tFitness: {best_fitness}", log_file_path)
+    log("", log_file_path)
 
     # Return the best solution and its fitness value
     return (best_solution, best_fitness)
 
-def run(fitness_function_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations, weights):
+def run(fitness_function_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations, weights, log_file_path):
     num_of_ants = 10
     pheromone_strength = 1
     pheromone_decay = 0.5
@@ -98,4 +99,4 @@ def run(fitness_function_file_paths, classifier_index, classes_file_path, num_of
         first_line = file.readline()
     solution_size = len(first_line.split(',')) - 1
 
-    return ant_colony_optimization(num_of_ants, num_of_iterations, pheromone_decay, pheromone_strength, fitness_function_file_paths, classifier_index, solution_size, pre_solutions, classes_file_path, num_of_packets_to_process, weights)
+    return ant_colony_optimization(num_of_ants, num_of_iterations, pheromone_decay, pheromone_strength, fitness_function_file_paths, classifier_index, solution_size, pre_solutions, classes_file_path, num_of_packets_to_process, weights, log_file_path)

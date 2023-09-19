@@ -43,7 +43,7 @@ def train_and_evaluate_classifier(classifier_index, train_features, train_labels
     clf = classifiers[classifier_index]
     clf.fit(train_features, train_labels)
     predictions = clf.predict(test_features)
-    return f1_score(test_labels, predictions, average='weighted')
+    return f1_score(test_labels, predictions, average='weighted'), predictions, test_labels
 
 def extract_features_and_labels(data, label_column_index):
     features = [row[:label_column_index] + row[label_column_index+1:] for row in data]

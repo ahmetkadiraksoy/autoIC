@@ -1,5 +1,6 @@
 from collections import defaultdict
 from optimization import load_csv, evaluate_fitness
+from libraries import log
 import random
 import csv
 import concurrent.futures
@@ -55,7 +56,7 @@ def randomize_packets(list_of_lists):
     # Combine the header and shuffled data to create the final randomized list
     return [header] + data
 
-def genetic_algorithm(pop_size, solution_size, mutation_rate, crossover_rate, fitness_function_file_paths, classifier_index, pre_solutions, num_of_iterations, classes_file_path, num_of_packets_to_process, weights):
+def genetic_algorithm(pop_size, solution_size, mutation_rate, crossover_rate, fitness_function_file_paths, classifier_index, pre_solutions, num_of_iterations, classes_file_path, num_of_packets_to_process, weights, log_file_path):
     # Load classes
     with open(classes_file_path, 'r') as file:
         classes = json.loads(file.readline())
@@ -75,7 +76,7 @@ def genetic_algorithm(pop_size, solution_size, mutation_rate, crossover_rate, fi
     packets_1.extend(element for element in load_csv(classes, fitness_function_file_paths[0], num_of_packets_to_process))
     packets_2.extend(element for element in load_csv(classes, fitness_function_file_paths[1], num_of_packets_to_process))
 
-    print()
+    log("", log_file_path)
 
     population = initialize_population(pop_size, solution_size)
     best_solution = None
@@ -114,16 +115,16 @@ def genetic_algorithm(pop_size, solution_size, mutation_rate, crossover_rate, fi
         else:
             best_solution = new_best_solution
             consecutive_same_solution_count = 0
-        print(f"Generation {generation}:\t[{''.join(map(str, best_solution))}]\tFitness: {max(fitness_scores)}")
+        log(f"Generation {generation}:\t[{''.join(map(str, best_solution))}]\tFitness: {max(fitness_scores)}", log_file_path)
         
         generation += 1
-    print()
+    log("", log_file_path)
     key = ''.join(map(str, best_solution))
     best_fitness = pre_solutions[key]
 
     return best_solution, best_fitness
 
-def run(fitness_function_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations, weights):
+def run(fitness_function_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations, weights, log_file_path):
     population_size = 50
     mutation_rate = 0.015
     crossover_rate = 0.5
@@ -134,4 +135,4 @@ def run(fitness_function_file_paths, classifier_index, classes_file_path, num_of
         first_line = file.readline()
     solution_size = len(first_line.split(',')) - 1
 
-    return genetic_algorithm(population_size, solution_size, mutation_rate, crossover_rate, fitness_function_file_paths, classifier_index, pre_solutions, num_of_iterations, classes_file_path, num_of_packets_to_process, weights)
+    return genetic_algorithm(population_size, solution_size, mutation_rate, crossover_rate, fitness_function_file_paths, classifier_index, pre_solutions, num_of_iterations, classes_file_path, num_of_packets_to_process, weights, log_file_path)

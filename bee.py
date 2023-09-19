@@ -1,5 +1,6 @@
 from collections import defaultdict
 from optimization import load_csv, evaluate_fitness
+from libraries import log
 import random
 import threading
 import json
@@ -8,13 +9,13 @@ import json
 thread_lock = threading.Lock()
 
 # Define the ABC algorithm
-def artificial_bee_colony(num_of_bees, num_of_iterations, limit, limit_inc, limit_dec, solution_size, fitness_function_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, weights, pre_solutions):
+def artificial_bee_colony(num_of_bees, num_of_iterations, limit, limit_inc, limit_dec, solution_size, fitness_function_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, weights, pre_solutions, log_file_path):
     # Load classes
     with open(classes_file_path, 'r') as file:
         classes = json.loads(file.readline())
 
     # Load the packets
-    print("Loading packets...")
+    log("Loading packets...", log_file_path)
     packets_1 = load_csv(classes, fitness_function_file_paths[0], num_of_packets_to_process)
     packets_2 = load_csv(classes, fitness_function_file_paths[1], num_of_packets_to_process)
 
@@ -53,13 +54,13 @@ def artificial_bee_colony(num_of_bees, num_of_iterations, limit, limit_inc, limi
 
         # Find and print the best solution in the current iteration
         best_bee = max(bees, key=lambda bee: bee['fitness'])
-        print(f"Iteration {iteration + 1}:\t[{''.join(map(str, best_bee['solution']))}]\tFitness: {best_bee['fitness']}")
+        log(f"Iteration {iteration + 1}:\t[{''.join(map(str, best_bee['solution']))}]\tFitness: {best_bee['fitness']}", log_file_path)
 
     # Return the best solution found
     best_solution = max(bees, key=lambda bee: bee['fitness'])
     return best_solution['solution'], best_solution['fitness']
 
-def run(fitness_function_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations, weights):
+def run(fitness_function_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations, weights, log_file_path):
     num_of_bees = 10
     limit = 10
     limit_inc = 1
@@ -71,4 +72,4 @@ def run(fitness_function_file_paths, classifier_index, classes_file_path, num_of
         first_line = file.readline()
     solution_size = len(first_line.split(',')) - 1
 
-    return artificial_bee_colony(num_of_bees, num_of_iterations, limit, limit_inc, limit_dec, solution_size, fitness_function_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, weights, pre_solutions)
+    return artificial_bee_colony(num_of_bees, num_of_iterations, limit, limit_inc, limit_dec, solution_size, fitness_function_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, weights, pre_solutions, log_file_path)
