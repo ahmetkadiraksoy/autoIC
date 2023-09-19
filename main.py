@@ -232,7 +232,7 @@ def main():
     protocol_folder_path = ""
     classes_file_path = ""
     selected_field_list_file_path = ""
-    log_file_name = "log.txt"
+    log_file_path = "log.txt"
     csv_file_paths = []
     pcap_file_names = []
     pcap_file_paths = []
@@ -300,7 +300,7 @@ def main():
                 sys.exit(1)
         elif sys.argv[index] in ('-l', '--log'):
             if index + 1 < len(sys.argv):
-                log_file_name = sys.argv[index + 1]
+                log_file_path = sys.argv[index + 1]
 
                 index += 2  # Skip both the option and its value
             else:
@@ -335,7 +335,7 @@ def main():
                 fitness_function_file_paths.append(f'{folder}{protocol}/batch_{order_of_batches[1]}.csv')
                 test_file_path = f'{folder}{protocol}/batch_{order_of_batches[2]}.csv'
                 selected_field_list_file_path = f'{folder}/{protocol}/fields.txt'
-                log_file_path = f'{folder}/{protocol}/{log_file_name}'
+                log_file_path = f'{folder}/{protocol}/{log_file_path}'
                 classes_file_path = f'{folder}/{protocol}/classes.json'
 
                 with open(selected_field_list_file_path, 'r') as file:
