@@ -68,7 +68,7 @@ def classify(train, test, classifier_index):
     except ValueError as e:
         print(f"Error: {e}")
 
-def classify_after_filtering(solution, fitness_function_file_paths, test_file_path, classifier_index):
+def classify_after_filtering(solution, fitness_function_file_paths, test_file_path, classifier_index, filter=None):
     # Append 1 to the end so that it doesn't filter out the 'class' column
     solution_new = list(solution)
     solution_new.append(1)
@@ -81,7 +81,8 @@ def classify_after_filtering(solution, fitness_function_file_paths, test_file_pa
     test = remove_duplicates_list_list(test)
 
     # Filter features
-    filtered_packets_train = [[col for col, m in zip(row, solution_new) if m] for row in train]
-    filtered_packets_test = [[col for col, m in zip(row, solution_new) if m] for row in test]
+    if (filter):
+        train = [[col for col, m in zip(row, solution_new) if m] for row in train]
+        test = [[col for col, m in zip(row, solution_new) if m] for row in test]
 
-    return classify(filtered_packets_train, filtered_packets_test, classifier_index)
+    return classify(train, test, classifier_index)

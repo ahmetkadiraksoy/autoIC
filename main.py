@@ -385,10 +385,19 @@ def main():
                 log(selected_field_list[i], log_file_path)
         f1_score_average, predictions, test_labels = ml.classify_after_filtering(best_solution, fitness_function_file_paths, test_file_path, classifier_index)
 
-        log("\nAccuracy: " + str(f1_score_average), log_file_path)
+        log("\nSelected feature-set accuracy: " + str(f1_score_average), log_file_path)
 
         # You can also print a classification report for more detailed metrics
         log("\nClassification Report:", log_file_path)
         log(classification_report(test_labels, predictions, zero_division=0), log_file_path)
+
+
+    f1_score_average, predictions, test_labels = ml.classify_after_filtering(best_solution, fitness_function_file_paths, test_file_path, classifier_index, True)
+
+    log("All feature-set accuracy: " + str(f1_score_average), log_file_path)
+
+    # You can also print a classification report for more detailed metrics
+    log("\nClassification Report:", log_file_path)
+    log(classification_report(test_labels, predictions, zero_division=0), log_file_path)
 
 main()
