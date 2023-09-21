@@ -5,6 +5,7 @@ import random
 import threading
 import csv
 import json
+import multiprocessing
 
 # Define a lock for synchronization
 thread_lock = threading.Lock()
@@ -52,7 +53,13 @@ def ant_colony_optimization(num_of_ants, num_of_iterations, pheromone_decay, phe
     while best_solution_counter + 1 < num_of_iterations:
         threads = []
         solutions = [[random.randint(0, 1) for _ in range(solution_size)] for _ in range(num_of_ants)]
-        fitness_values = [evaluate_fitness(s, packets_1, packets_2, classifier_index, pre_solutions, weights) for s in solutions]
+
+        num_cores = multiprocessing.cpu_count() - 1 # Determine the number of CPU cores minus 1
+        with multiprocessing.Pool(processes=num_cores) as pool:
+            fitness_values = pool.starmap(evaluate_fitness, [(solution, packets_1, packets_2, classifier_index, pre_solutions, weights) for solution in solutions])
+
+        pool.close()
+        pool.join()
 
         current_best_solution = None
         current_best_fitness = None

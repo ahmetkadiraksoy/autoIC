@@ -217,7 +217,7 @@ def extract_features_from_pcap(blacklist_file_path, feature_names_file_path, pro
     # Write field names to file
     write_selected_field_list_to_file(csv_file_paths, selected_field_list_file_path)
 
-def main():
+if __name__ == '__main__':
     # Check if at least one argument (excluding the script name) is provided
     if len(sys.argv) < 2:
         print("Usage: python script.py arg1 arg2...")
@@ -399,5 +399,3 @@ def main():
     # You can also print a classification report for more detailed metrics
     log("\nClassification Report:", log_file_path)
     log(classification_report(test_labels, predictions, zero_division=0), log_file_path)
-
-main()

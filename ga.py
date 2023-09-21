@@ -8,6 +8,7 @@ import os
 import threading
 import random
 import json
+import multiprocessing
 
 # Define a lock for synchronization
 thread_lock = threading.Lock()
@@ -101,12 +102,12 @@ def genetic_algorithm(pop_size, solution_size, mutation_rate, crossover_rate, fi
             population = new_population
         
         # Evaluate the fitness of each solution in the population using multi-threading
-        fitness_scores = []
-        num_cores = os.cpu_count() - 1 # Determine the number of CPU cores minus 1
-        with concurrent.futures.ThreadPoolExecutor(max_workers=num_cores) as executor:
-            for solution in population:
-                future = executor.submit(evaluate_fitness, solution, packets_1, packets_2, classifier_index, pre_solutions, weights)
-                fitness_scores.append(future.result())
+        num_cores = multiprocessing.cpu_count() - 1 # Determine the number of CPU cores minus 1
+        with multiprocessing.Pool(processes=num_cores) as pool:
+            fitness_scores = pool.starmap(evaluate_fitness, [(solution, packets_1, packets_2, classifier_index, pre_solutions, weights) for solution in population])
+
+        pool.close()
+        pool.join()
 
         # Track and display the best solution in this generation
         new_best_solution = population[fitness_scores.index(max(fitness_scores))]
