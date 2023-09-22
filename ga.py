@@ -5,6 +5,7 @@ import random
 import csv
 import concurrent.futures
 import os
+import sys
 import threading
 import random
 import json
@@ -57,7 +58,9 @@ def randomize_packets(list_of_lists):
     # Combine the header and shuffled data to create the final randomized list
     return [header] + data
 
-def genetic_algorithm(pop_size, solution_size, mutation_rate, crossover_rate, fitness_function_file_paths, classifier_index, pre_solutions, num_of_iterations, classes_file_path, num_of_packets_to_process, weights, log_file_path, max_num_of_generations):
+def genetic_algorithm(pop_size, solution_size, mutation_rate, crossover_rate, fitness_function_file_paths, classifier_index, num_of_iterations, classes_file_path, num_of_packets_to_process, weights, log_file_path, max_num_of_generations):
+    pre_solutions = defaultdict(float)
+    
     # Load classes
     with open(classes_file_path, 'r') as file:
         classes = json.loads(file.readline())
@@ -104,10 +107,15 @@ def genetic_algorithm(pop_size, solution_size, mutation_rate, crossover_rate, fi
         # Evaluate the fitness of each solution in the population using multi-threading
         num_cores = multiprocessing.cpu_count() - 1 # Determine the number of CPU cores minus 1
         with multiprocessing.Pool(processes=num_cores) as pool:
-            fitness_scores = pool.starmap(evaluate_fitness, [(solution, packets_1, packets_2, classifier_index, pre_solutions, weights) for solution in population])
+            results = pool.starmap(evaluate_fitness, [(solution, packets_1, packets_2, classifier_index, pre_solutions, weights) for solution in population])
 
         pool.close()
         pool.join()
+
+        fitness_scores = []
+        for result in results:
+            fitness_scores.append(result[0])
+            pre_solutions.update(result[1])
 
         # Track and display the best solution in this generation
         new_best_solution = population[fitness_scores.index(max(fitness_scores))]
@@ -123,17 +131,16 @@ def genetic_algorithm(pop_size, solution_size, mutation_rate, crossover_rate, fi
     key = ''.join(map(str, best_solution))
     best_fitness = pre_solutions[key]
 
-    return best_solution, best_fitness
+    return (best_solution, best_fitness)
 
 def run(fitness_function_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations, weights, log_file_path, max_num_of_generations):
     population_size = 50
     mutation_rate = 0.015
     crossover_rate = 0.5
-    pre_solutions = defaultdict(float)
 
     # Determine solution size (number of features)
     with open(fitness_function_file_paths[0], 'r') as file:
         first_line = file.readline()
     solution_size = len(first_line.split(',')) - 1
 
-    return genetic_algorithm(population_size, solution_size, mutation_rate, crossover_rate, fitness_function_file_paths, classifier_index, pre_solutions, num_of_iterations, classes_file_path, num_of_packets_to_process, weights, log_file_path, max_num_of_generations)
+    return genetic_algorithm(population_size, solution_size, mutation_rate, crossover_rate, fitness_function_file_paths, classifier_index, num_of_iterations, classes_file_path, num_of_packets_to_process, weights, log_file_path, max_num_of_generations)

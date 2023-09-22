@@ -223,180 +223,175 @@ if __name__ == '__main__':
         print("Usage: python script.py arg1 arg2...")
         sys.exit(1)
 
+    # Determine filters folder path
+    filters_folder = os.path.join(os.path.dirname(__file__), "filters")
+    if not os.path.exists(filters_folder):
+        print("The 'filters' folder is missing")
+        sys.exit(1)
+
+    # Variables
     classifier_index = 0
-    folder = ""
-    protocol = ""
-    pcap_folder_path = ""
-    blacklist_file_path = ""
-    feature_names_file_path = ""
-    protocol_folder_path = ""
-    classes_file_path = ""
-    selected_field_list_file_path = ""
-    log_file_path = "log.txt"
-    csv_file_paths = []
-    pcap_file_names = []
-    pcap_file_paths = []
-    fitness_function_file_paths = []
-    selected_field_list = []
+    max_num_of_generations = 50
     num_of_iterations = 10
     num_of_packets_to_process = 0
     order_of_batches = [1,2,3]
     weights = [0.9,0.1]
-    max_num_of_generations = 100
-    filter_folder = os.path.join(os.path.dirname(__file__), "filters")
+    log_file_path = "log.txt"
     mode = ""
-
-    if not os.path.exists(filter_folder):
-        print("The 'filters' folder is missing")
-        sys.exit(1)
+    folder = ""
+    protocol = ""
 
     # Loop through command-line arguments starting from the second element
     index = 1
     while index < len(sys.argv):
         if sys.argv[index] in ('-p', '--protocol'):
-            if index + 1 < len(sys.argv):
-                protocol = sys.argv[index + 1]
-                index += 2  # Skip both the option and its value
-            else:
+            if index + 1 >= len(sys.argv):
                 print("Missing value for -p/--protocol option")
                 sys.exit(1)
+
+            protocol = sys.argv[index + 1]
+            index += 2  # Skip both the option and its value
         elif sys.argv[index] in ('-b', '--batch'):
-            if index + 1 < len(sys.argv):
-                order_of_batches = sys.argv[index + 1].split(',')
-                index += 2  # Skip both the option and its value
-            else:
+            if index + 1 >= len(sys.argv):
                 print("Missing value for -b/--batch option")
                 sys.exit(1)
+            
+            order_of_batches = sys.argv[index + 1].split(',')
+            index += 2  # Skip both the option and its value
+        elif sys.argv[index] in ('-i', '--iteration'):
+            if index + 1 >= len(sys.argv):
+                print("Missing value for -i/--iteration option")
+                sys.exit(1)
+            
+            num_of_iterations = int(sys.argv[index + 1])
+            index += 2  # Skip both the option and its value
+        elif sys.argv[index] in ('-g', '--generation'):
+            if index + 1 >= len(sys.argv):
+                print("Missing value for -g/--generation option")
+                sys.exit(1)
+            
+            max_num_of_generations = int(sys.argv[index + 1])
+            index += 2  # Skip both the option and its value
         elif sys.argv[index] in ('-w', '--weights'):
-            if index + 1 < len(sys.argv):
-                weights = [float(value) for value in sys.argv[index + 1].split(',')]
-                index += 2  # Skip both the option and its value
-            else:
+            if index + 1 >= len(sys.argv):
                 print("Missing value for -w/--weights option")
                 sys.exit(1)
+
+            weights = [float(value) for value in sys.argv[index + 1].split(',')]
+            index += 2  # Skip both the option and its value
         elif sys.argv[index] in ('-n'):
-            if index + 1 < len(sys.argv):
-                num_of_packets_to_process = int(sys.argv[index + 1])
-                index += 2  # Skip both the option and its value
-            else:
+            if index + 1 >= len(sys.argv):
                 print("Missing value for -n option")
                 sys.exit(1)
+
+            num_of_packets_to_process = int(sys.argv[index + 1])
+            index += 2  # Skip both the option and its value
         elif sys.argv[index] in ('-f', '--folder'):
-            if index + 1 < len(sys.argv):
-                folder = fix_trailing_character(sys.argv[index + 1])
-                pcap_folder = folder + "pcap"
-
-                if not os.path.exists(folder):
-                    print(f"The folder {folder} is missing")
-                    sys.exit(1)
-                if not os.path.exists(pcap_folder):
-                    print("The 'pcap' folder is missing")
-                    sys.exit(1)
-                if len([f for f in os.listdir(pcap_folder) if f.endswith('.pcap')]) == 0:
-                    print("There are no pcap files in the 'pcap' folder")
-                    sys.exit(1)
-                index += 2  # Skip both the option and its value
-            else:
+            if index + 1 >= len(sys.argv):
                 print("Missing value for -f/--folder option")
                 sys.exit(1)
+
+            folder = fix_trailing_character(sys.argv[index + 1])
+            index += 2  # Skip both the option and its value
         elif sys.argv[index] in ('-l', '--log'):
-            if index + 1 < len(sys.argv):
-                log_file_path = sys.argv[index + 1]
-
-                index += 2  # Skip both the option and its value
-            else:
+            if index + 1 >= len(sys.argv):
                 print("Missing value for -f/--folder option")
                 sys.exit(1)
+
+            log_file_path = sys.argv[index + 1]
+            index += 2  # Skip both the option and its value
         elif sys.argv[index] in ('-e', '--extract'):
-            if folder == "" or protocol == "":
-                print("Incorrect parameter order given!")
-                sys.exit(1)
-
-            # Set parameters
-            pcap_folder_path = folder + "pcap"
-            blacklist_file_path = f'{filter_folder}/blacklist.txt'
-            feature_names_file_path = f'{filter_folder}/{protocol}.txt'
-            protocol_folder_path = f'{folder}{protocol}'
-            for i in range(3):
-                csv_file_paths.append(f'{folder}{protocol}/batch_{i+1}.csv')
-            pcap_file_names = [f for f in os.listdir(pcap_folder_path) if f.endswith('.pcap')]
-            pcap_file_paths = [folder + "pcap/" + file_name for file_name in pcap_file_names]
-            classes_file_path = f'{folder}/{protocol}/classes.json'
-            selected_field_list_file_path = f'{folder}/{protocol}/fields.txt'
-
             mode = "extract"
             index += 1
         elif sys.argv[index] in ('-m', '--mode'):
-            if folder == "":
-                print("Incorrect parameter order given!")
-                sys.exit(1)
-
-            if index + 1 < len(sys.argv): # If there exists the value
-                fitness_function_file_paths.append(f'{folder}{protocol}/batch_{order_of_batches[0]}.csv')
-                fitness_function_file_paths.append(f'{folder}{protocol}/batch_{order_of_batches[1]}.csv')
-                test_file_path = f'{folder}{protocol}/batch_{order_of_batches[2]}.csv'
-                selected_field_list_file_path = f'{folder}/{protocol}/fields.txt'
-                log_file_path = f'{folder}/{protocol}/{log_file_path}'
-                classes_file_path = f'{folder}/{protocol}/classes.json'
-
-                with open(selected_field_list_file_path, 'r') as file:
-                    selected_field_list = file.readline().strip().split(',')
-
-                mode = sys.argv[index+1]
-                index += 2  # Skip both the option and its value
-            else:
+            if index + 1 >= len(sys.argv):
                 print("Missing value for -m/--mode option")
                 sys.exit(1)
+
+            mode = sys.argv[index + 1]
+            index += 2  # Skip both the option and its value
         elif sys.argv[index] in ('-c', '--classifier'):
-            if index + 1 < len(sys.argv):
-                classifier_index = int(sys.argv[index+1])
-                index += 2  # Skip both the option and its value
-            else:
+            if index + 1 >= len(sys.argv):
                 print("Missing value for -c/--classifier option")
                 sys.exit(1)
+
+            classifier_index = int(sys.argv[index+1])
+            index += 2  # Skip both the option and its value
         else:
             print(f"Unknown parameter! '{sys.argv[index]}'")
             sys.exit(1)
 
-    # Create the log file
+    # Set parameters and perform validation checks
+    if folder == "":
+        print("Workspace folder not given!")
+        sys.exit(1)
+
+    if not os.path.exists(folder):
+        print(f"The folder {folder} is missing")
+        sys.exit(1)
+
+    pcap_folder_path = folder + "pcap"
+    if not os.path.exists(pcap_folder_path):
+        print("The 'pcap' folder is missing")
+        sys.exit(1)
+
+    if len([f for f in os.listdir(pcap_folder_path) if f.endswith('.pcap')]) == 0:
+        print("There are no pcap files in the 'pcap' folder")
+        sys.exit(1)
+
     if os.path.exists(log_file_path):
-        os.remove(log_file_path)
-    with open(log_file_path, 'w') as file:
-        pass
+        os.remove(log_file_path) # Remove previous log file
+
+    csv_file_paths = []
+    classes_file_path = f'{folder}/{protocol}/classes.json'
+    fitness_function_file_paths = []
+    selected_field_list_file_path = f'{folder}/{protocol}/fields.txt'
+    selected_field_list = []
+    with open(selected_field_list_file_path, 'r') as file:
+        selected_field_list = file.readline().strip().split(',')
 
     # Run the mode
     if mode == 'extract':
+        blacklist_file_path = f'{filters_folder}/blacklist.txt'
+        feature_names_file_path = f'{filters_folder}/{protocol}.txt'
+        protocol_folder_path = f'{folder}{protocol}'
+        for i in range(3):
+            csv_file_paths.append(f'{folder}{protocol}/batch_{i+1}.csv')
+        pcap_file_names = [f for f in os.listdir(pcap_folder_path) if f.endswith('.pcap')]
+        pcap_file_paths = [folder + "pcap/" + file_name for file_name in pcap_file_names]
+
         print("converting pcap files to csv format...\n")
         extract_features_from_pcap(blacklist_file_path, feature_names_file_path, protocol_folder_path, csv_file_paths, pcap_file_names, pcap_file_paths, classes_file_path, selected_field_list_file_path)
-    elif mode == 'ga':
-        log("running GA...", log_file_path)
-        best_solution, best_fitness = ga.run(fitness_function_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations, weights, log_file_path, max_num_of_generations)
-    elif mode == 'aco':
-        log("running ACO...", log_file_path)
-        best_solution, best_fitness = aco.run(fitness_function_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations, weights, log_file_path, max_num_of_generations)
-    else:
-        print("Unknown entry for the mode")
+    elif mode == 'ga' or mode == 'aco':
+        fitness_function_file_paths.append(f'{folder}{protocol}/batch_{order_of_batches[0]}.csv')
+        fitness_function_file_paths.append(f'{folder}{protocol}/batch_{order_of_batches[1]}.csv')
+        test_file_path = f'{folder}{protocol}/batch_{order_of_batches[2]}.csv'
+        log_file_path = f'{folder}/{protocol}/{log_file_path}'
 
-    # Print results
-    if mode == 'ga' or mode == 'aco':
+        if mode == 'ga':
+            log("running GA...", log_file_path)
+            best_solution, best_fitness = ga.run(fitness_function_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations, weights, log_file_path, max_num_of_generations)
+        elif mode == 'aco':
+            log("running ACO...", log_file_path)
+            best_solution, best_fitness = aco.run(fitness_function_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations, weights, log_file_path, max_num_of_generations)
+
+        # Print best solution and the features selected
         log(f"Best Solution:\t[{''.join(map(str, best_solution))}]\tFitness: {best_fitness}", log_file_path)
         log("\nSelected features:", log_file_path)
         for i in range(len(best_solution)):
             if best_solution[i] == 1:
                 log(selected_field_list[i], log_file_path)
+
+        # Print the classification result on test data using selected features
         f1_score_average, predictions, test_labels = ml.classify_after_filtering(best_solution, fitness_function_file_paths, test_file_path, classifier_index)
-
         log("\nSelected feature-set accuracy: " + str(f1_score_average), log_file_path)
-
-        # You can also print a classification report for more detailed metrics
         log("\nClassification Report:", log_file_path)
         log(classification_report(test_labels, predictions, zero_division=0), log_file_path)
 
-
-    f1_score_average, predictions, test_labels = ml.classify_after_filtering(best_solution, fitness_function_file_paths, test_file_path, classifier_index, True)
-
-    log("All feature-set accuracy: " + str(f1_score_average), log_file_path)
-
-    # You can also print a classification report for more detailed metrics
-    log("\nClassification Report:", log_file_path)
-    log(classification_report(test_labels, predictions, zero_division=0), log_file_path)
+        # Print the classification result on test data using all features
+        f1_score_average, predictions, test_labels = ml.classify_after_filtering(best_solution, fitness_function_file_paths, test_file_path, classifier_index, True)
+        log("All feature-set accuracy: " + str(f1_score_average), log_file_path)
+        log("\nClassification Report:", log_file_path)
+        log(classification_report(test_labels, predictions, zero_division=0), log_file_path)
+    else:
+        print("Unknown entry for the mode")

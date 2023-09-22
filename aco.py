@@ -11,7 +11,9 @@ import multiprocessing
 thread_lock = threading.Lock()
 
 # Define the ACO algorithm
-def ant_colony_optimization(num_of_ants, num_of_iterations, pheromone_decay, pheromone_strength, fitness_function_file_paths, classifier_index, solution_size, pre_solutions, classes_file_path, num_of_packets_to_process, weights, log_file_path, max_num_of_generations):
+def ant_colony_optimization(num_of_ants, num_of_iterations, pheromone_decay, pheromone_strength, fitness_function_file_paths, classifier_index, solution_size, classes_file_path, num_of_packets_to_process, weights, log_file_path, max_num_of_generations):
+    pre_solutions = defaultdict(float)
+
     # Load classes
     with open(classes_file_path, 'r') as file:
         classes = json.loads(file.readline())
@@ -56,10 +58,15 @@ def ant_colony_optimization(num_of_ants, num_of_iterations, pheromone_decay, phe
 
         num_cores = multiprocessing.cpu_count() - 1 # Determine the number of CPU cores minus 1
         with multiprocessing.Pool(processes=num_cores) as pool:
-            fitness_values = pool.starmap(evaluate_fitness, [(solution, packets_1, packets_2, classifier_index, pre_solutions, weights) for solution in solutions])
+            results = pool.starmap(evaluate_fitness, [(solution, packets_1, packets_2, classifier_index, pre_solutions, weights) for solution in solutions])
 
         pool.close()
         pool.join()
+
+        fitness_values = []
+        for result in results:
+            fitness_values.append(result[0])
+            pre_solutions.update(result[1])
 
         current_best_solution = None
         current_best_fitness = None
@@ -75,11 +82,11 @@ def ant_colony_optimization(num_of_ants, num_of_iterations, pheromone_decay, phe
         # Choose the best solution based on the fitness values
         ant_fitness_max_index = fitness_values.index(max(fitness_values))
         current_best_solution = solutions[ant_fitness_max_index]
-        current_best_fitness = evaluate_fitness(current_best_solution, packets_1, packets_2, classifier_index, pre_solutions, weights)
+        current_best_fitness = evaluate_fitness(current_best_solution, packets_1, packets_2, classifier_index, pre_solutions, weights)[0]
 
         # If the current best solution is better than the previous best solution,
         # update the best solution and best fitness
-        if best_solution is None or current_best_fitness > evaluate_fitness(best_solution, packets_1, packets_2, classifier_index, pre_solutions, weights):
+        if best_solution is None or current_best_fitness > evaluate_fitness(best_solution, packets_1, packets_2, classifier_index, pre_solutions, weights)[0]:
             best_solution = current_best_solution
             best_fitness = current_best_fitness
             best_solution_counter = 1
@@ -99,11 +106,10 @@ def run(fitness_function_file_paths, classifier_index, classes_file_path, num_of
     num_of_ants = 10
     pheromone_strength = 1
     pheromone_decay = 0.5
-    pre_solutions = defaultdict(float)
 
     # Determine solution size (number of features)
     with open(fitness_function_file_paths[0], 'r') as file:
         first_line = file.readline()
     solution_size = len(first_line.split(',')) - 1
 
-    return ant_colony_optimization(num_of_ants, num_of_iterations, pheromone_decay, pheromone_strength, fitness_function_file_paths, classifier_index, solution_size, pre_solutions, classes_file_path, num_of_packets_to_process, weights, log_file_path, max_num_of_generations)
+    return ant_colony_optimization(num_of_ants, num_of_iterations, pheromone_decay, pheromone_strength, fitness_function_file_paths, classifier_index, solution_size, classes_file_path, num_of_packets_to_process, weights, log_file_path, max_num_of_generations)

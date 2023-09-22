@@ -1,3 +1,4 @@
+from collections import defaultdict
 import threading
 import ml
 import csv
@@ -8,16 +9,17 @@ import numpy as np
 thread_lock = threading.Lock()
 
 def evaluate_fitness(solution, packets_1, packets_2, classifier_index, pre_solutions, weights):
+    pre_solutions_temp = defaultdict(float)
+
     # If no features are to be selected
     if sum(solution) == 0:
-        return 0.0
+        return 0.0, pre_solutions_temp
 
     key = ''.join(map(str, solution))
 
     # Acquire the lock before reading pre_solutions
-    with thread_lock:
-        if key in pre_solutions:
-            return pre_solutions[key]
+    if key in pre_solutions:
+        return pre_solutions[key], pre_solutions_temp
 
     # Append 1 to the end so that it doesn't filter out the 'class' column
     solution_new = solution + [1]
@@ -41,10 +43,9 @@ def evaluate_fitness(solution, packets_1, packets_2, classifier_index, pre_solut
     fitness = weights[0] * average_accuracy + weights[1] * feature_accuracy
 
     # Acquire the lock before updating pre_solutions
-    with thread_lock:
-        pre_solutions[key] = fitness
+    pre_solutions_temp[key] = fitness
 
-    return fitness
+    return fitness, pre_solutions_temp
 
 def load_csv(classes, fitness_function_file_path, n):
     packets = []
