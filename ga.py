@@ -3,9 +3,6 @@ from optimization import load_csv, evaluate_fitness
 from libraries import log
 import random
 import csv
-import concurrent.futures
-import os
-import sys
 import threading
 import random
 import json

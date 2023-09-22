@@ -72,4 +72,8 @@ def load_csv(classes, fitness_function_file_path, n):
 
             # Append the selected lines directly to packets
             packets.extend(lines[:no_of_packets_to_keep])
+    
+    # Imputate the data (change NaN to -1)
+    packets = [['-1' if value == 'NaN' else value for value in packet] for packet in packets]
+
     return packets

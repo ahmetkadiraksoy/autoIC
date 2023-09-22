@@ -9,6 +9,10 @@ def load_csv(file_path):
     with open(file_path, 'r') as f:
         reader = csv.reader(f)
         data = [row for row in reader]
+
+    # Imputate the data (change NaN to -1)
+    data = [['-1' if value == 'NaN' else value for value in packet] for packet in data]
+
     return data
 
 def remove_duplicates_list_list(list_of_lists):
