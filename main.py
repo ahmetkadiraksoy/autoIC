@@ -242,6 +242,7 @@ if __name__ == '__main__':
     num_of_packets_to_process = 0
     order_of_batches = [1,2,3]
     weights = [0.9,0.1]
+    max_num_of_generations = 100
     filter_folder = os.path.join(os.path.dirname(__file__), "filters")
     mode = ""
 
@@ -369,10 +370,10 @@ if __name__ == '__main__':
         extract_features_from_pcap(blacklist_file_path, feature_names_file_path, protocol_folder_path, csv_file_paths, pcap_file_names, pcap_file_paths, classes_file_path, selected_field_list_file_path)
     elif mode == 'ga':
         log("running GA...", log_file_path)
-        best_solution, best_fitness = ga.run(fitness_function_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations, weights, log_file_path)
+        best_solution, best_fitness = ga.run(fitness_function_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations, weights, log_file_path, max_num_of_generations)
     elif mode == 'aco':
         log("running ACO...", log_file_path)
-        best_solution, best_fitness = aco.run(fitness_function_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations, weights, log_file_path)
+        best_solution, best_fitness = aco.run(fitness_function_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations, weights, log_file_path, max_num_of_generations)
     else:
         print("Unknown entry for the mode")
 
