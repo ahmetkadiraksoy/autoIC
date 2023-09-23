@@ -3,13 +3,9 @@ from optimization import load_csv, evaluate_fitness
 from libraries import log
 import random
 import csv
-import threading
 import random
 import json
 import multiprocessing
-
-# Define a lock for synchronization
-thread_lock = threading.Lock()
 
 def initialize_population(pop_size, solution_size):
     # Initialize a population of random binary solutions
@@ -55,7 +51,7 @@ def randomize_packets(list_of_lists):
     # Combine the header and shuffled data to create the final randomized list
     return [header] + data
 
-def genetic_algorithm(pop_size, solution_size, mutation_rate, crossover_rate, fitness_function_file_paths, classifier_index, num_of_iterations, classes_file_path, num_of_packets_to_process, weights, log_file_path, max_num_of_generations):
+def genetic_algorithm(pop_size, solution_size, mutation_rate, crossover_rate, train_file_paths, classifier_index, num_of_iterations, classes_file_path, num_of_packets_to_process, weights, log_file_path, max_num_of_generations):
     pre_solutions = defaultdict(float)
     
     # Load classes
@@ -63,19 +59,19 @@ def genetic_algorithm(pop_size, solution_size, mutation_rate, crossover_rate, fi
         classes = json.loads(file.readline())
 
     # Load the packets
-    print("loading packets...")
+    log("loading packets...", log_file_path)
     packets_1 = []
     packets_2 = []
 
     # Read header from CSV
-    with open(fitness_function_file_paths[0], 'r', newline='') as csv_file:
+    with open(train_file_paths[0], 'r', newline='') as csv_file:
         csv_reader = csv.reader(csv_file)
         header = next(csv_reader)
         packets_1.append(header)
         packets_2.append(header)
 
-    packets_1.extend(element for element in load_csv(classes, fitness_function_file_paths[0], num_of_packets_to_process))
-    packets_2.extend(element for element in load_csv(classes, fitness_function_file_paths[1], num_of_packets_to_process))
+    packets_1.extend(element for element in load_csv(classes, train_file_paths[0], num_of_packets_to_process, log_file_path))
+    packets_2.extend(element for element in load_csv(classes, train_file_paths[1], num_of_packets_to_process, log_file_path))
 
     log("", log_file_path)
 
@@ -83,7 +79,7 @@ def genetic_algorithm(pop_size, solution_size, mutation_rate, crossover_rate, fi
     best_solution = None
 
     consecutive_same_solution_count = 0
-    generation = 1
+    generation = 0
 
     while consecutive_same_solution_count < num_of_iterations and generation < max_num_of_generations:
         if best_solution is not None:
@@ -121,7 +117,8 @@ def genetic_algorithm(pop_size, solution_size, mutation_rate, crossover_rate, fi
         else:
             best_solution = new_best_solution
             consecutive_same_solution_count = 0
-        log(f"Generation {generation}:\t[{''.join(map(str, best_solution))}]\tFitness: {max(fitness_scores)}", log_file_path)
+        sol_str = ''.join(map(str, best_solution))
+        log(f"Generation {generation + 1}:\t[{sol_str}]\t[{sol_str.count('1')}/{len(sol_str)}]\tFitness: {max(fitness_scores)}", log_file_path)
         
         generation += 1
     log("", log_file_path)
@@ -130,14 +127,14 @@ def genetic_algorithm(pop_size, solution_size, mutation_rate, crossover_rate, fi
 
     return (best_solution, best_fitness)
 
-def run(fitness_function_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations, weights, log_file_path, max_num_of_generations):
+def run(train_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations, weights, log_file_path, max_num_of_generations):
     population_size = 50
     mutation_rate = 0.015
     crossover_rate = 0.5
 
     # Determine solution size (number of features)
-    with open(fitness_function_file_paths[0], 'r') as file:
+    with open(train_file_paths[0], 'r') as file:
         first_line = file.readline()
     solution_size = len(first_line.split(',')) - 1
 
-    return genetic_algorithm(population_size, solution_size, mutation_rate, crossover_rate, fitness_function_file_paths, classifier_index, num_of_iterations, classes_file_path, num_of_packets_to_process, weights, log_file_path, max_num_of_generations)
+    return genetic_algorithm(population_size, solution_size, mutation_rate, crossover_rate, train_file_paths, classifier_index, num_of_iterations, classes_file_path, num_of_packets_to_process, weights, log_file_path, max_num_of_generations)

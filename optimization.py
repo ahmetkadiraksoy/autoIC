@@ -1,25 +1,26 @@
 from collections import defaultdict
+from libraries import log
+import numpy as np
 import threading
 import ml
 import csv
 import random
-import numpy as np
 
 # Define a lock for synchronization
 thread_lock = threading.Lock()
 
 def evaluate_fitness(solution, packets_1, packets_2, classifier_index, pre_solutions, weights):
-    pre_solutions_temp = defaultdict(float)
+    pre_solutions_gen = defaultdict(float)
 
     # If no features are to be selected
     if sum(solution) == 0:
-        return 0.0, pre_solutions_temp
+        return 0.0, pre_solutions_gen
 
     key = ''.join(map(str, solution))
 
     # Acquire the lock before reading pre_solutions
     if key in pre_solutions:
-        return pre_solutions[key], pre_solutions_temp
+        return pre_solutions[key], pre_solutions_gen
 
     # Append 1 to the end so that it doesn't filter out the 'class' column
     solution_new = solution + [1]
@@ -43,14 +44,14 @@ def evaluate_fitness(solution, packets_1, packets_2, classifier_index, pre_solut
     fitness = weights[0] * average_accuracy + weights[1] * feature_accuracy
 
     # Acquire the lock before updating pre_solutions
-    pre_solutions_temp[key] = fitness
+    pre_solutions_gen[key] = fitness
 
-    return fitness, pre_solutions_temp
+    return fitness, pre_solutions_gen
 
-def load_csv(classes, fitness_function_file_path, n):
+def load_csv(classes, fitness_function_file_path, n, log_file_path):
     packets = []
     for i in range(len(classes)):
-        print("reading from " + classes[str(i)] + "...")
+        log("reading from " + classes[str(i)] + "...", log_file_path)
         with open(fitness_function_file_path, 'r', newline='') as csv_file:
             csv_reader = csv.reader(csv_file)
 

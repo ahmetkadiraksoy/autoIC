@@ -1,4 +1,3 @@
-from sklearn.metrics import classification_report
 from libraries import log
 import pandas as pd
 import subprocess
@@ -40,24 +39,34 @@ def fix_trailing_character(input_string):
     return input_string.rstrip('/') + '/'  # Remove trailing '/' and add it back
 
 # Function to remove duplicate rows from a list
-def remove_duplicates_rows(input_list):
-    return [list(t) for t in set(tuple(row) for row in input_list)]  # Use sets to remove duplicates
+def remove_duplicates_rows(csv_data):
+    seen = set()
+    unique_csv_data = []
+
+    for sublist in csv_data:
+        tuple_sublist = tuple(sublist)
+
+        if tuple_sublist not in seen:
+            unique_csv_data.append(sublist)
+            seen.add(tuple_sublist)
+
+    return unique_csv_data
 
 # Function to remove rows with all empty entries from CSV data
-def remove_rows_with_nan(csv_data):
+def remove_rows_with_nan_values(csv_data):
     return [list(row) for row in csv_data if not all(entry == "" for entry in row[:-1])]  # Filter rows with non-empty entries
 
 # Function to modify a dataset represented as a list of lists (CSV data)
 def modify_dataset(csv_data):
     # Iterate through rows of the dataset
     for i in range(len(csv_data)):
-        # Iterate through columns of each row except the last one
+        # Iterate through columns of each row except the label
         for j in range(len(csv_data[i]) - 1):
             cell = csv_data[i][j]
 
-            # If the cell is empty, replace it with 'NaN'
+            # If the cell is empty, replace it with '-1'
             if len(cell) == 0:
-                csv_data[i][j] = 'NaN'
+                csv_data[i][j] = '-1'
             else:
                 tokens = cell.split(',')
                 total = 0
@@ -68,7 +77,7 @@ def modify_dataset(csv_data):
                         # Convert hexadecimal to decimal
                         decimal_value = int(token, 16)
                         token = str(decimal_value)
-                    elif not is_numeric(token.replace(',', '')):  # Check if the token is alphanumeric
+                    elif not is_numeric(token):  # Check if the token is alphanumeric
                         # Calculate the hash value using the hash() function
                         decimal_hash = hash(token)
                         token = str(decimal_hash)
@@ -102,22 +111,30 @@ def read_and_filter_feature_names(feature_names_file_path, blacklisted_features)
 
 # Function to determine and remove empty fields from CSV files
 def remove_empty_fields_from_csv_files(csv_file_paths):
-    intersection_of_columns_with_all_nan = {}
-    for i in range(len(csv_file_paths)):
-        df = pd.read_csv(csv_file_paths[i], low_memory=False)
+    # Read all CSV files into a list of DataFrames
+    dfs = [pd.read_csv(file_path, low_memory=False) for file_path in csv_file_paths]
 
-        columns_with_all_nan = df.columns[df.isnull().all()].tolist()
-        if len(intersection_of_columns_with_all_nan) == 0:
-            intersection_of_columns_with_all_nan = set(columns_with_all_nan)
-        else:
-            intersection_of_columns_with_all_nan = intersection_of_columns_with_all_nan & set(columns_with_all_nan)
+    # Find columns with only one unique value across all DataFrames
+    common_columns = set(dfs[0].columns)
+    for df in dfs[1:]:
+        common_columns &= set(df.columns)
 
-    if len(intersection_of_columns_with_all_nan) > 0:
+    columns_to_remove = set()
+
+    # Check if each common column has only one unique value across all DataFrames
+    for col in common_columns:
+        common_values = set(dfs[0][col].unique())
+        for df in dfs[1:]:
+            common_values &= set(df[col].unique())
+        if len(common_values) == 1:
+            columns_to_remove.add(col)
+
+    if columns_to_remove:
         print("removing empty fields...")
         for i in range(len(csv_file_paths)):
             df = pd.read_csv(csv_file_paths[i], low_memory=False)
-            df = df.drop(columns=intersection_of_columns_with_all_nan, errors='ignore')
-            df.to_csv(csv_file_paths[i], index=False, na_rep='NaN')
+            df = df.drop(columns=columns_to_remove, errors='ignore')
+            df.to_csv(csv_file_paths[i], index=False)
 
 # Function to write header row with feature names to CSV files
 def write_header_to_csv_files(csv_file_paths, feature_names):
@@ -158,27 +175,27 @@ def extract_features_from_pcap(blacklist_file_path, feature_names_file_path, pro
     blacklisted_features = read_blacklisted_features(blacklist_file_path)
 
     # Read feature names from the text file
-    feature_names = read_and_filter_feature_names(feature_names_file_path, blacklisted_features)
+    csv_header = read_and_filter_feature_names(feature_names_file_path, blacklisted_features)
 
-    # Write header row with feature names
-    write_header_to_csv_files(csv_file_paths, feature_names)
+    # Write header row with feature names  to csv files
+    write_header_to_csv_files(csv_file_paths, csv_header)
 
     # List of classes (dict)
     list_of_classes = {}
-    list_counter = 0
+    class_counter = 0
 
     # Loop through each pcap file in the provided folder
     for index in range(len(pcap_file_names)):
         pcap_file_name = pcap_file_names[index]
         class_name = pcap_file_name.split('.pcap')[0]
-        list_of_classes[list_counter] = class_name
+        list_of_classes[class_counter] = class_name
         pcap_file_path = pcap_file_paths[index]
 
         print("processing " + pcap_file_name + "...")
 
         # Prepare the tshark command to be executed
         tshark_cmd = ['tshark', '-r', pcap_file_path, '-T', 'fields']
-        for feature in feature_names[:-1]:
+        for feature in csv_header[:-1]:
             tshark_cmd.append('-e')
             tshark_cmd.append(feature)
 
@@ -186,13 +203,15 @@ def extract_features_from_pcap(blacklist_file_path, feature_names_file_path, pro
         tshark_output = subprocess.check_output(tshark_cmd, universal_newlines=True)
 
         # Parse tshark output and write to CSV file
-        csv_data = [line.split('\t') + [str(list_counter)] for line in tshark_output.strip().split('\n') if len(line.split('\t')) == len(feature_names) - 1]
+        csv_data = [line.split('\t') + [str(class_counter)] for line in tshark_output.strip().split('\n') if len(line.split('\t')) == len(csv_header) - 1]
+
+        del tshark_output
+
+        # Filter out rows where the 'label' column is not 'NaN'
+        csv_data = remove_rows_with_nan_values(csv_data)
 
         # Remove duplicates
         csv_data = remove_duplicates_rows(csv_data)
-
-        # Filter out rows where the 'label' column is not 'NaN'
-        csv_data = remove_rows_with_nan(csv_data)
 
         # Modify dataset
         modify_dataset(csv_data)
@@ -203,7 +222,7 @@ def extract_features_from_pcap(blacklist_file_path, feature_names_file_path, pro
         # Write the packets to CSV file
         write_packets_to_csv_files(csv_file_paths, num_of_lines_per_file, csv_data)
 
-        list_counter += 1
+        class_counter += 1
     print()
 
     # Write class list to file
@@ -339,16 +358,18 @@ if __name__ == '__main__':
         print("There are no pcap files in the 'pcap' folder")
         sys.exit(1)
 
+    log_file_path = f'{folder}/{protocol}/{log_file_path}'
     if os.path.exists(log_file_path):
         os.remove(log_file_path) # Remove previous log file
 
     csv_file_paths = []
     classes_file_path = f'{folder}/{protocol}/classes.json'
-    fitness_function_file_paths = []
+    train_file_paths = []
     selected_field_list_file_path = f'{folder}/{protocol}/fields.txt'
     selected_field_list = []
-    with open(selected_field_list_file_path, 'r') as file:
-        selected_field_list = file.readline().strip().split(',')
+    if os.path.exists(selected_field_list_file_path):
+        with open(selected_field_list_file_path, 'r') as file:
+            selected_field_list = file.readline().strip().split(',')
 
     # Run the mode
     if mode == 'extract':
@@ -363,35 +384,32 @@ if __name__ == '__main__':
         print("converting pcap files to csv format...\n")
         extract_features_from_pcap(blacklist_file_path, feature_names_file_path, protocol_folder_path, csv_file_paths, pcap_file_names, pcap_file_paths, classes_file_path, selected_field_list_file_path)
     elif mode == 'ga' or mode == 'aco':
-        fitness_function_file_paths.append(f'{folder}{protocol}/batch_{order_of_batches[0]}.csv')
-        fitness_function_file_paths.append(f'{folder}{protocol}/batch_{order_of_batches[1]}.csv')
+        train_file_paths.append(f'{folder}{protocol}/batch_{order_of_batches[0]}.csv')
+        train_file_paths.append(f'{folder}{protocol}/batch_{order_of_batches[1]}.csv')
         test_file_path = f'{folder}{protocol}/batch_{order_of_batches[2]}.csv'
-        log_file_path = f'{folder}/{protocol}/{log_file_path}'
 
         if mode == 'ga':
-            log("running GA...", log_file_path)
-            best_solution, best_fitness = ga.run(fitness_function_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations, weights, log_file_path, max_num_of_generations)
+            log("running GA...\n", log_file_path)
+            best_solution, best_fitness = ga.run(train_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations, weights, log_file_path, max_num_of_generations)
         elif mode == 'aco':
-            log("running ACO...", log_file_path)
-            best_solution, best_fitness = aco.run(fitness_function_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations, weights, log_file_path, max_num_of_generations)
+            log("running ACO...\n", log_file_path)
+            best_solution, best_fitness = aco.run(train_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations, weights, log_file_path, max_num_of_generations)
 
         # Print best solution and the features selected
-        log(f"Best Solution:\t[{''.join(map(str, best_solution))}]\tFitness: {best_fitness}", log_file_path)
+        sol_str = ''.join(map(str, best_solution))
+        log(f"Best Solution:\t[{sol_str}]\t[{sol_str.count('1')}/{len(sol_str)}]\tFitness: {best_fitness}", log_file_path)
         log("\nSelected features:", log_file_path)
         for i in range(len(best_solution)):
             if best_solution[i] == 1:
                 log(selected_field_list[i], log_file_path)
 
         # Print the classification result on test data using selected features
-        f1_score_average, predictions, test_labels = ml.classify_after_filtering(best_solution, fitness_function_file_paths, test_file_path, classifier_index)
-        log("\nSelected feature-set accuracy: " + str(f1_score_average), log_file_path)
-        log("\nClassification Report:", log_file_path)
-        log(classification_report(test_labels, predictions, zero_division=0), log_file_path)
-
+        log("", log_file_path)
+        log("Selected feature-set results:", log_file_path)
+        ml.classify_after_filtering(best_solution, train_file_paths, test_file_path, classifier_index, log_file_path)
+        
         # Print the classification result on test data using all features
-        f1_score_average, predictions, test_labels = ml.classify_after_filtering(best_solution, fitness_function_file_paths, test_file_path, classifier_index, True)
-        log("All feature-set accuracy: " + str(f1_score_average), log_file_path)
-        log("\nClassification Report:", log_file_path)
-        log(classification_report(test_labels, predictions, zero_division=0), log_file_path)
+        log("All feature-set results:", log_file_path)
+        ml.classify_after_filtering(best_solution, train_file_paths, test_file_path, classifier_index, log_file_path, True)
     else:
         print("Unknown entry for the mode")

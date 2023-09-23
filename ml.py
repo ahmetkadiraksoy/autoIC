@@ -3,6 +3,8 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVC
 from sklearn.neural_network import MLPClassifier
+from libraries import log
+from sklearn.metrics import classification_report
 import csv
 
 def load_csv(file_path):
@@ -72,7 +74,7 @@ def classify(train, test, classifier_index):
     except ValueError as e:
         print(f"Error: {e}")
 
-def classify_after_filtering(solution, fitness_function_file_paths, test_file_path, classifier_index, filter=None):
+def classify_after_filtering(solution, fitness_function_file_paths, test_file_path, classifier_index, log_file_path, filter=None):
     # Append 1 to the end so that it doesn't filter out the 'class' column
     solution_new = list(solution)
     solution_new.append(1)
@@ -89,4 +91,8 @@ def classify_after_filtering(solution, fitness_function_file_paths, test_file_pa
         train = [[col for col, m in zip(row, solution_new) if m] for row in train]
         test = [[col for col, m in zip(row, solution_new) if m] for row in test]
 
-    return classify(train, test, classifier_index)
+    f1_score_average, predictions, test_labels = classify(train, test, classifier_index)
+
+    log("\nAccuracy: " + str(f1_score_average), log_file_path)
+    log("\nClassification Report:", log_file_path)
+    log(classification_report(test_labels, predictions, zero_division=0), log_file_path)
