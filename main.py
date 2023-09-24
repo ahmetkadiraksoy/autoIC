@@ -406,10 +406,10 @@ if __name__ == '__main__':
         # Print the classification result on test data using selected features
         log("", log_file_path)
         log("Selected feature-set results:", log_file_path)
-        ml.classify_after_filtering(best_solution, train_file_paths, test_file_path, classifier_index, log_file_path)
+        ml.classify_after_filtering(best_solution, train_file_paths, test_file_path, classifier_index, log_file_path, True)
         
         # Print the classification result on test data using all features
         log("All feature-set results:", log_file_path)
-        ml.classify_after_filtering(best_solution, train_file_paths, test_file_path, classifier_index, log_file_path, True)
+        ml.classify_after_filtering(best_solution, train_file_paths, test_file_path, classifier_index, log_file_path, False)
     else:
         print("Unknown entry for the mode")

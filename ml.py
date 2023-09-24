@@ -11,10 +11,6 @@ def load_csv(file_path):
     with open(file_path, 'r') as f:
         reader = csv.reader(f)
         data = [row for row in reader]
-
-    # Imputate the data (change NaN to -1)
-    data = [['-1' if value == 'NaN' else value for value in packet] for packet in data]
-
     return data
 
 def remove_duplicates_list_list(list_of_lists):
@@ -40,9 +36,9 @@ def remove_duplicates_list_list(list_of_lists):
 def train_and_evaluate_classifier(classifier_index, train_features, train_labels, test_features, test_labels):
     # List of classifiers to test
     classifiers = [
-        DecisionTreeClassifier(),
-        RandomForestClassifier(),
-        SVC(),
+        DecisionTreeClassifier(random_state=42),
+        RandomForestClassifier(random_state=42),
+        SVC(random_state=42),
         MLPClassifier(hidden_layer_sizes=(100, 50), max_iter=1000, random_state=42)
     ]
 
@@ -74,11 +70,7 @@ def classify(train, test, classifier_index):
     except ValueError as e:
         print(f"Error: {e}")
 
-def classify_after_filtering(solution, fitness_function_file_paths, test_file_path, classifier_index, log_file_path, filter=None):
-    # Append 1 to the end so that it doesn't filter out the 'class' column
-    solution_new = list(solution)
-    solution_new.append(1)
-
+def classify_after_filtering(solution, fitness_function_file_paths, test_file_path, classifier_index, log_file_path, filter):
     train = []
     train.extend(load_csv(fitness_function_file_paths[0]))
     train.extend(load_csv(fitness_function_file_paths[1])[1:]) # remove header
@@ -88,6 +80,10 @@ def classify_after_filtering(solution, fitness_function_file_paths, test_file_pa
 
     # Filter features
     if (filter):
+        # Append 1 to the end so that it doesn't filter out the 'class' column
+        solution_new = list(solution)
+        solution_new.append(1)
+
         train = [[col for col, m in zip(row, solution_new) if m] for row in train]
         test = [[col for col, m in zip(row, solution_new) if m] for row in test]
 
