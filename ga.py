@@ -1,9 +1,8 @@
 from collections import defaultdict
-from optimization import load_csv, evaluate_fitness
+from optimization import load_csv_and_filter, evaluate_fitness
 from libraries import log
 import random
 import csv
-import random
 import json
 import multiprocessing
 
@@ -70,8 +69,8 @@ def genetic_algorithm(pop_size, solution_size, mutation_rate, crossover_rate, tr
         packets_1.append(header)
         packets_2.append(header)
 
-    packets_1.extend(element for element in load_csv(classes, train_file_paths[0], num_of_packets_to_process, log_file_path))
-    packets_2.extend(element for element in load_csv(classes, train_file_paths[1], num_of_packets_to_process, log_file_path))
+    packets_1.extend(element for element in load_csv_and_filter(classes, train_file_paths[0], num_of_packets_to_process, log_file_path))
+    packets_2.extend(element for element in load_csv_and_filter(classes, train_file_paths[1], num_of_packets_to_process, log_file_path))
 
     log("", log_file_path)
 

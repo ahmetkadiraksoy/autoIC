@@ -1,5 +1,5 @@
 from collections import defaultdict
-from optimization import load_csv, evaluate_fitness
+from optimization import load_csv_and_filter, evaluate_fitness
 from libraries import log
 import random
 import threading
@@ -16,8 +16,8 @@ def artificial_bee_colony(num_of_bees, num_of_iterations, limit, limit_inc, limi
 
     # Load the packets
     log("Loading packets...", log_file_path)
-    packets_1 = load_csv(classes, fitness_function_file_paths[0], num_of_packets_to_process)
-    packets_2 = load_csv(classes, fitness_function_file_paths[1], num_of_packets_to_process)
+    packets_1 = load_csv_and_filter(classes, fitness_function_file_paths[0], num_of_packets_to_process)
+    packets_2 = load_csv_and_filter(classes, fitness_function_file_paths[1], num_of_packets_to_process)
 
     # Initialize the bee population
     bees = [{'solution': [random.randint(0, 1) for _ in range(solution_size)], 'fitness': None} for _ in range(num_of_bees)]

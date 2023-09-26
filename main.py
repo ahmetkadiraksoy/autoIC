@@ -27,13 +27,6 @@ def is_hexadecimal(s):
 def calculate_list_average(lst):
     return sum(lst) / len(lst) if lst else 0  # Return the average or 0 if the list is empty
 
-# Function to load data from a CSV file
-def load_csv(file_path):
-    with open(file_path, 'r') as f:
-        reader = csv.reader(f)
-        data = [row for row in reader]  # Read rows from the CSV file
-    return data  # Return the loaded data as a list
-
 # Function to fix trailing slash character in a string
 def fix_trailing_character(input_string):
     return input_string.rstrip('/') + '/'  # Remove trailing '/' and add it back
@@ -236,6 +229,31 @@ def extract_features_from_pcap(blacklist_file_path, feature_names_file_path, pro
     # Write field names to file
     write_selected_field_list_to_file(csv_file_paths, selected_field_list_file_path)
 
+def print_usage():
+    """Print a usage guide for the program."""
+    print("Usage: python autoIC.py [options]")
+    print("Options:")
+    print("  -p, --protocol    Specify the protocol (e.g., http, ftp)")
+    print("  -b, --batch       Specify a comma-separated list of batch orders")
+    print("  -i, --iteration   Specify the number of iterations")
+    print("  -g, --generation  Specify the maximum number of generations")
+    print("  -w, --weights     Specify weights as a comma-separated list")
+    print("  -n                Specify the number of packets to process")
+    print("  -f, --folder      Specify the folder path")
+    print("  -l, --log         Specify the log file path")
+    print("  -e, --extract     Set the mode to 'extract'")
+    print("  -m, --mode        Specify the mode (e.g., 'mode1', 'mode2')")
+    print("  -c, --classifier  Specify the classifier index (integer)")
+    print("  -h, --help        Display this help message")
+    print()
+    print("Example:")
+    print("python autoIC.py -p http -b batch1,batch2 -i 100 -g 10 -w 0.5,0.3 -n 50 -f /path/to/folder -l logfile.txt -e -m mode1 -c 0")
+    print()
+    print("Note:")
+    print("- Use commas to separate multiple values for options that accept lists (e.g., -b, -w).")
+    print("- When using options with values, ensure that the value follows the option without spaces.")
+    print("- Use -h or --help to display this help message.")
+
 if __name__ == '__main__':
     # Check if at least one argument (excluding the script name) is provided
     if len(sys.argv) < 2:
@@ -329,6 +347,9 @@ if __name__ == '__main__':
 
             mode = sys.argv[index + 1]
             index += 2  # Skip both the option and its value
+        elif sys.argv[index] in ('-h', '--help'):
+            print_usage()
+            sys.exit(0)
         elif sys.argv[index] in ('-c', '--classifier'):
             if index + 1 >= len(sys.argv):
                 print("Missing value for -c/--classifier option")

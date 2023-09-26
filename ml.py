@@ -1,4 +1,5 @@
 from sklearn.metrics import f1_score
+from sklearn.naive_bayes import GaussianNB
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVC, LinearSVC
@@ -10,7 +11,7 @@ import csv
 def load_csv(file_path):
     with open(file_path, 'r') as f:
         reader = csv.reader(f)
-        data = [row for row in reader]
+        data = [float(row) for row in reader]
     return data
 
 def remove_duplicates_list_list(list_of_lists):
@@ -39,8 +40,9 @@ def train_and_evaluate_classifier(classifier_index, train_features, train_labels
         DecisionTreeClassifier(random_state=42),
         RandomForestClassifier(random_state=42),
         SVC(random_state=42),
-        LinearSVC(random_state=42),
-        MLPClassifier(hidden_layer_sizes=(100, 50), max_iter=1000, random_state=42)
+        LinearSVC(random_state=42, dual='auto', C=1.0, max_iter=10000),
+        MLPClassifier(hidden_layer_sizes=(50, 10), max_iter=1000, random_state=42),
+        GaussianNB()
     ]
 
     clf = classifiers[classifier_index]

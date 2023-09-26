@@ -48,33 +48,21 @@ def evaluate_fitness(solution, packets_1, packets_2, classifier_index, pre_solut
 
     return fitness, pre_solutions_gen
 
-def load_csv(classes, fitness_function_file_path, n, log_file_path):
+def load_csv_and_filter(classes, fitness_function_file_path, n, log_file_path):
     packets = []
     for i in range(len(classes)):
         log("reading from " + classes[str(i)] + "...", log_file_path)
         with open(fitness_function_file_path, 'r', newline='') as csv_file:
             csv_reader = csv.reader(csv_file)
+            next(csv_reader, None) # Skip the header row
 
-            # Skip the header row (if it exists)
-            next(csv_reader, None)
-
-            lines = []
-            # Iterate through the rows line by line
-            for row in csv_reader:
-                if row[-1] == str(i):
-                    lines.append(row)
-
+            lines = [row for row in csv_reader if row[-1] == str(i)]
             random.shuffle(lines)
 
-            if n == 0:
-                no_of_packets_to_keep = len(lines)
-            else:
-                no_of_packets_to_keep = min(n, len(lines))
-
-            # Append the selected lines directly to packets
-            packets.extend(lines[:no_of_packets_to_keep])
+            no_of_packets_to_keep = len(lines) if n == 0 else min(n, len(lines))
+            packets.extend(lines[:no_of_packets_to_keep]) # Append the selected lines directly to packets
     
-    # Imputate the data (change NaN to -1)
-    packets = [['-1' if value == 'NaN' else value for value in packet] for packet in packets]
+    # Imputate the data (change NaN to -1) and convert to float
+    packets = [[-1.0 if value == 'NaN' else float(value) for value in packet] for packet in packets]
 
     return packets
