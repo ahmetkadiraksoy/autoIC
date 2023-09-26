@@ -1,7 +1,7 @@
 from sklearn.metrics import f1_score
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.svm import SVC
+from sklearn.svm import SVC, LinearSVC
 from sklearn.neural_network import MLPClassifier
 from libraries import log
 from sklearn.metrics import classification_report
@@ -39,6 +39,7 @@ def train_and_evaluate_classifier(classifier_index, train_features, train_labels
         DecisionTreeClassifier(random_state=42),
         RandomForestClassifier(random_state=42),
         SVC(random_state=42),
+        LinearSVC(random_state=42),
         MLPClassifier(hidden_layer_sizes=(100, 50), max_iter=1000, random_state=42)
     ]
 
