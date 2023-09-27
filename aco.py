@@ -11,7 +11,7 @@ import multiprocessing
 thread_lock = threading.Lock()
 
 # Define the ACO algorithm
-def ant_colony_optimization(num_of_ants, num_of_iterations, pheromone_decay, pheromone_strength, train_file_paths, classifier_index, solution_size, classes_file_path, num_of_packets_to_process, weights, log_file_path, max_num_of_generations):
+def ant_colony_optimization(num_of_ants, num_of_iterations, pheromone_decay, pheromone_strength, train_file_paths, classifier_index, solution_size, classes_file_path, num_of_packets_to_process, weights, log_file_path, max_num_of_generations, fields_file_path):
     pre_solutions = defaultdict(float)
 
     # Load classes
@@ -23,10 +23,9 @@ def ant_colony_optimization(num_of_ants, num_of_iterations, pheromone_decay, phe
     packets_1 = []
     packets_2 = []
 
-    # Read header from CSV
-    with open(train_file_paths[0], 'r', newline='') as csv_file:
-        csv_reader = csv.reader(csv_file)
-        header = next(csv_reader)
+    # Read header from fields file
+    with open(fields_file_path, 'r') as file:
+        header = file.readline().strip().split(',') + ['label']
         packets_1.append(header)
         packets_2.append(header)
 
@@ -103,14 +102,18 @@ def ant_colony_optimization(num_of_ants, num_of_iterations, pheromone_decay, phe
     # Return the best solution and its fitness value
     return (best_solution, best_fitness)
 
-def run(train_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations, weights, log_file_path, max_num_of_generations):
+def run(train_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations, weights, log_file_path, max_num_of_generations, fields_file_path):
+    # Configuration parameters
     num_of_ants = 10
     pheromone_strength = 1
     pheromone_decay = 0.5
 
     # Determine solution size (number of features)
     with open(train_file_paths[0], 'r') as file:
-        first_line = file.readline()
-    solution_size = len(first_line.split(',')) - 1
+        solution_size = len(file.readline().split(',')) - 1
 
-    return ant_colony_optimization(num_of_ants, num_of_iterations, pheromone_decay, pheromone_strength, train_file_paths, classifier_index, solution_size, classes_file_path, num_of_packets_to_process, weights, log_file_path, max_num_of_generations)
+    return ant_colony_optimization(
+        num_of_ants, num_of_iterations, pheromone_decay, pheromone_strength, train_file_paths,
+        classifier_index, solution_size, classes_file_path, num_of_packets_to_process, weights,
+        log_file_path, max_num_of_generations, fields_file_path
+    )

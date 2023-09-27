@@ -5,9 +5,6 @@ import random
 import threading
 import json
 
-# Define a lock for synchronization
-thread_lock = threading.Lock()
-
 # Define the ABC algorithm
 def artificial_bee_colony(num_of_bees, num_of_iterations, limit, limit_inc, limit_dec, solution_size, fitness_function_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, weights, pre_solutions, log_file_path):
     # Load classes
@@ -69,7 +66,11 @@ def run(fitness_function_file_paths, classifier_index, classes_file_path, num_of
 
     # Determine solution size (number of features)
     with open(fitness_function_file_paths[0], 'r') as file:
-        first_line = file.readline()
-    solution_size = len(first_line.split(',')) - 1
+        solution_size = len(file.readline().split(',')) - 1
 
-    return artificial_bee_colony(num_of_bees, num_of_iterations, limit, limit_inc, limit_dec, solution_size, fitness_function_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, weights, pre_solutions, log_file_path)
+    return artificial_bee_colony(
+        num_of_bees, num_of_iterations, limit, limit_inc, 
+        limit_dec, solution_size, fitness_function_file_paths, 
+        classifier_index, classes_file_path, num_of_packets_to_process, 
+        weights, pre_solutions, log_file_path
+    )

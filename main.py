@@ -408,13 +408,14 @@ if __name__ == '__main__':
         train_file_paths.append(f'{folder}{protocol}/batch_{order_of_batches[0]}.csv')
         train_file_paths.append(f'{folder}{protocol}/batch_{order_of_batches[1]}.csv')
         test_file_path = f'{folder}{protocol}/batch_{order_of_batches[2]}.csv'
+        fields_file_path = f'{folder}{protocol}/fields.txt'
 
         if mode == 'ga':
             log("running GA...\n", log_file_path)
-            best_solution, best_fitness = ga.run(train_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations, weights, log_file_path, max_num_of_generations)
+            best_solution, best_fitness = ga.run(train_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations, weights, log_file_path, max_num_of_generations, fields_file_path)
         elif mode == 'aco':
             log("running ACO...\n", log_file_path)
-            best_solution, best_fitness = aco.run(train_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations, weights, log_file_path, max_num_of_generations)
+            best_solution, best_fitness = aco.run(train_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations, weights, log_file_path, max_num_of_generations, fields_file_path)
 
         # Print best solution and the features selected
         sol_str = ''.join(map(str, best_solution))

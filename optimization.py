@@ -1,13 +1,9 @@
 from collections import defaultdict
 from libraries import log
 import numpy as np
-import threading
 import ml
 import csv
 import random
-
-# Define a lock for synchronization
-thread_lock = threading.Lock()
 
 def evaluate_fitness(solution, packets_1, packets_2, classifier_index, pre_solutions, weights):
     pre_solutions_gen = defaultdict(float)
@@ -31,13 +27,11 @@ def evaluate_fitness(solution, packets_1, packets_2, classifier_index, pre_solut
     
     fitness_1 = ml.classify(filtered_packets_1, filtered_packets_2, classifier_index)[0]
     fitness_2 = ml.classify(filtered_packets_2, filtered_packets_1, classifier_index)[0]
-
     average_accuracy = np.mean([fitness_1, fitness_2])
 
     # Calculate feature accuracy
     num_selected_features = sum(solution)
     total_features = len(solution) - 1  # Excluding the class column
-
     feature_accuracy = 1 - ((num_selected_features - 1) / total_features)
 
     # Calculate fitness as a weighted combination of average accuracy and feature accuracy
