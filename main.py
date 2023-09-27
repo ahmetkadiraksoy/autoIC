@@ -9,8 +9,8 @@ import ga
 import ml
 import aco
 import json
+import statistics
 
-# Function to check if a string is numeric
 def is_numeric(input_string):
     try:
         float(input_string) # Attempt to convert the input string to a float
@@ -18,20 +18,15 @@ def is_numeric(input_string):
     except ValueError:
         return False  # Return False if ValueError is raised (not numeric)
 
-# Function to check if a string is hexadecimal
 def is_hexadecimal(s):
-    pattern = r"^[0-9A-Fa-f]+$"  # Regular expression pattern for hexadecimal
-    return bool(re.match(pattern, s))  # Return True if the string matches the pattern
+    return bool(re.match(r"^[0-9A-Fa-f]+$", s))
 
-# Function to calculate the average of a list of numbers
 def calculate_list_average(lst):
     return sum(lst) / len(lst) if lst else 0  # Return the average or 0 if the list is empty
 
-# Function to fix trailing slash character in a string
 def fix_trailing_character(input_string):
     return input_string.rstrip('/') + '/'  # Remove trailing '/' and add it back
 
-# Function to remove duplicate rows from a list
 def remove_duplicates_rows(csv_data):
     seen = set()
     unique_csv_data = []
@@ -45,11 +40,9 @@ def remove_duplicates_rows(csv_data):
 
     return unique_csv_data
 
-# Function to remove rows with all empty entries from CSV data
 def remove_rows_with_nan_values(csv_data):
     return [list(row) for row in csv_data if not all(entry == "" for entry in row[:-1])]  # Filter rows with non-empty entries
 
-# Function to modify a dataset represented as a list of lists (CSV data)
 def modify_dataset(csv_data):
     # Iterate through rows of the dataset
     for i in range(len(csv_data)):
@@ -81,7 +74,6 @@ def modify_dataset(csv_data):
                 # Replace the cell value with the remainder modulo a large constant
                 csv_data[i][j] = str(total % 0xFFFFFFFF)
 
-# Function to read blacklisted features from a file
 def read_blacklisted_features(blacklist_file_path):
     if os.path.exists(blacklist_file_path):
         with open(blacklist_file_path, 'r') as f:
@@ -90,19 +82,53 @@ def read_blacklisted_features(blacklist_file_path):
         print(f"The file '{blacklist_file_path}' was not found.")
         sys.exit(1)
 
-# Function to read feature names and filter blacklisted features
 def read_and_filter_feature_names(feature_names_file_path, blacklisted_features):
     if os.path.exists(feature_names_file_path):
         with open(feature_names_file_path, 'r') as f:
-            feature_names = f.read().splitlines()
-            feature_names = [feature for feature in feature_names if feature not in blacklisted_features]
+            feature_names = [feature for feature in f.read().splitlines() if feature not in blacklisted_features]
             feature_names.append('label')
         return feature_names
     else:
         print(f"The file '{feature_names_file_path}' was not found.")
         sys.exit(1)
 
-# Function to determine and remove empty fields from CSV files
+def add_stat_features_to_csv_files(csv_file_paths):
+    for file_path in csv_file_paths:
+        # Read the CSV file into a DataFrame
+        df = pd.read_csv(file_path)
+
+        # Create a list to store the new header
+        new_header = []
+
+        # Iterate through the existing header and create new columns for statistics
+        for field in df.columns[:-1]:  # Exclude the last column (label)
+            new_header.extend([field])
+        for field in df.columns[:-1]:  # Exclude the last column (label)
+            new_header.extend([f"{field}_min", f"{field}_max", f"{field}_mean", f"{field}_std", f"{field}_mode"])
+        new_header.append(df.columns[-1])
+
+        # Calculate statistics for each numeric column
+        stats = []
+        for field in df.columns[:-1]:  # Exclude the last column (label)
+            column_values = df[field].tolist()
+            stats.extend([min(column_values), max(column_values), statistics.mean(column_values), statistics.stdev(column_values), statistics.mode(column_values)])
+
+        csv_data = []
+        csv_data.append(new_header)
+
+        # Iterate through the DataFrame rows and append the list
+        for index, row in df.iterrows():
+            if index == 0:
+                continue  # Skip the header row
+            row_list = row.tolist()
+            row_list = row_list[:-1] + stats + [int(row_list[-1])]
+            csv_data.append(row_list)
+
+        with open(file_path, 'w') as file:
+            for inner_list in csv_data:
+                line = ','.join(map(str, inner_list))  # Convert inner list to a comma-separated string
+                file.write(line + '\n')
+
 def remove_empty_fields_from_csv_files(csv_file_paths):
     # Read all CSV files into a list of DataFrames
     dfs = [pd.read_csv(file_path, low_memory=False) for file_path in csv_file_paths]
@@ -129,15 +155,13 @@ def remove_empty_fields_from_csv_files(csv_file_paths):
             df = df.drop(columns=columns_to_remove, errors='ignore')
             df.to_csv(csv_file_paths[i], index=False)
 
-# Function to write header row with feature names to CSV files
 def write_header_to_csv_files(csv_file_paths, feature_names):
     for i in range(len(csv_file_paths)):
         with open(csv_file_paths[i], 'w') as f:
             csv_line = ','.join(feature_names)
             f.write(f"{csv_line}\n")
 
-# Function to write selected field list to a file
-def write_selected_field_list_to_file(csv_file_paths, selected_field_list_file_path):
+def write_remaining_field_list_to_file(csv_file_paths, selected_field_list_file_path):
     selected_field_list = []
     with open(csv_file_paths[0], 'r') as file:
         csv_reader = csv.reader(file)
@@ -146,7 +170,6 @@ def write_selected_field_list_to_file(csv_file_paths, selected_field_list_file_p
     with open(selected_field_list_file_path, 'w') as file:
         file.write(','.join(selected_field_list[:-1]))
 
-# Write the packets to CSV file
 def write_packets_to_csv_files(csv_file_paths, num_of_lines_per_file, csv_data):
     for i in range(len(csv_file_paths)):
         start_idx = i * num_of_lines_per_file
@@ -159,7 +182,7 @@ def write_packets_to_csv_files(csv_file_paths, num_of_lines_per_file, csv_data):
                 csv_line = ','.join(line)
                 f.write(f"{csv_line}\n")
 
-def extract_features_from_pcap(blacklist_file_path, feature_names_file_path, protocol_folder_path, csv_file_paths, pcap_file_names, pcap_file_paths, classes_file_path, selected_field_list_file_path):
+def extract_features_from_pcap(blacklist_file_path, feature_names_file_path, protocol_folder_path, csv_file_paths, pcap_file_names, pcap_file_paths, classes_file_path, selected_field_list_file_path, statistical_features_on):
     # Create protocol folder
     if not os.path.exists(protocol_folder_path):
         os.makedirs(protocol_folder_path)
@@ -167,10 +190,10 @@ def extract_features_from_pcap(blacklist_file_path, feature_names_file_path, pro
     # Read blacklisted features
     blacklisted_features = read_blacklisted_features(blacklist_file_path)
 
-    # Read feature names from the text file
+    # Read feature names from the filters folder
     csv_header = read_and_filter_feature_names(feature_names_file_path, blacklisted_features)
 
-    # Write header row with feature names  to csv files
+    # Write header row with feature names to csv files
     write_header_to_csv_files(csv_file_paths, csv_header)
 
     # List of classes (dict)
@@ -226,8 +249,11 @@ def extract_features_from_pcap(blacklist_file_path, feature_names_file_path, pro
     print("determining empty fields...")
     remove_empty_fields_from_csv_files(csv_file_paths)
 
-    # Write field names to file
-    write_selected_field_list_to_file(csv_file_paths, selected_field_list_file_path)
+    if statistical_features_on:
+        add_stat_features_to_csv_files(csv_file_paths)
+
+    # Write remaining field names to file
+    write_remaining_field_list_to_file(csv_file_paths, selected_field_list_file_path)
 
 def print_usage():
     """Print a usage guide for the program."""
@@ -255,8 +281,7 @@ def print_usage():
     print("- Use -h or --help to display this help message.")
 
 if __name__ == '__main__':
-    # Check if at least one argument (excluding the script name) is provided
-    if len(sys.argv) < 2:
+    if len(sys.argv) < 2: # check if at least one argument is provided
         print("Usage: python script.py arg1 arg2...")
         sys.exit(1)
 
@@ -277,6 +302,7 @@ if __name__ == '__main__':
     mode = ""
     folder = ""
     protocol = ""
+    statistical_features_on = False
 
     # Loop through command-line arguments starting from the second element
     index = 1
@@ -339,6 +365,9 @@ if __name__ == '__main__':
             index += 2  # Skip both the option and its value
         elif sys.argv[index] in ('-e', '--extract'):
             mode = "extract"
+            index += 1
+        elif sys.argv[index] in ('-s', '--statistics'):
+            statistical_features_on = True
             index += 1
         elif sys.argv[index] in ('-m', '--mode'):
             if index + 1 >= len(sys.argv):
@@ -403,7 +432,7 @@ if __name__ == '__main__':
         pcap_file_paths = [folder + "pcap/" + file_name for file_name in pcap_file_names]
 
         print("converting pcap files to csv format...\n")
-        extract_features_from_pcap(blacklist_file_path, feature_names_file_path, protocol_folder_path, csv_file_paths, pcap_file_names, pcap_file_paths, classes_file_path, selected_field_list_file_path)
+        extract_features_from_pcap(blacklist_file_path, feature_names_file_path, protocol_folder_path, csv_file_paths, pcap_file_names, pcap_file_paths, classes_file_path, selected_field_list_file_path, statistical_features_on)
     elif mode == 'ga' or mode == 'aco':
         train_file_paths.append(f'{folder}{protocol}/batch_{order_of_batches[0]}.csv')
         train_file_paths.append(f'{folder}{protocol}/batch_{order_of_batches[1]}.csv')
