@@ -75,20 +75,20 @@ def modify_dataset(csv_data):
                 csv_data[i][j] = str(total % 0xFFFFFFFF)
 
 def read_blacklisted_features(blacklist_file_path):
-    if os.path.exists(blacklist_file_path):
+    try:
         with open(blacklist_file_path, 'r') as f:
             return f.read().splitlines()
-    else:
+    except FileNotFoundError:
         print(f"The file '{blacklist_file_path}' was not found.")
         sys.exit(1)
 
 def read_and_filter_feature_names(feature_names_file_path, blacklisted_features):
-    if os.path.exists(feature_names_file_path):
+    try:
         with open(feature_names_file_path, 'r') as f:
             feature_names = [feature for feature in f.read().splitlines() if feature not in blacklisted_features]
             feature_names.append('label')
         return feature_names
-    else:
+    except FileNotFoundError:
         print(f"The file '{feature_names_file_path}' was not found.")
         sys.exit(1)
 
@@ -432,7 +432,11 @@ if __name__ == '__main__':
         pcap_file_paths = [folder + "pcap/" + file_name for file_name in pcap_file_names]
 
         print("converting pcap files to csv format...\n")
-        extract_features_from_pcap(blacklist_file_path, feature_names_file_path, protocol_folder_path, csv_file_paths, pcap_file_names, pcap_file_paths, classes_file_path, selected_field_list_file_path, statistical_features_on)
+        extract_features_from_pcap(
+            blacklist_file_path, feature_names_file_path, protocol_folder_path,
+            csv_file_paths, pcap_file_names, pcap_file_paths, classes_file_path,
+            selected_field_list_file_path, statistical_features_on
+        )
     elif mode == 'ga' or mode == 'aco':
         train_file_paths.append(f'{folder}{protocol}/batch_{order_of_batches[0]}.csv')
         train_file_paths.append(f'{folder}{protocol}/batch_{order_of_batches[1]}.csv')
@@ -441,10 +445,18 @@ if __name__ == '__main__':
 
         if mode == 'ga':
             log("running GA...\n", log_file_path)
-            best_solution, best_fitness = ga.run(train_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations, weights, log_file_path, max_num_of_generations, fields_file_path)
+            best_solution, best_fitness = ga.run(
+                train_file_paths, classifier_index, classes_file_path,
+                num_of_packets_to_process, num_of_iterations, weights,
+                log_file_path, max_num_of_generations, fields_file_path
+            )
         elif mode == 'aco':
             log("running ACO...\n", log_file_path)
-            best_solution, best_fitness = aco.run(train_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations, weights, log_file_path, max_num_of_generations, fields_file_path)
+            best_solution, best_fitness = aco.run(
+                train_file_paths, classifier_index, classes_file_path,
+                num_of_packets_to_process, num_of_iterations, weights,
+                log_file_path, max_num_of_generations, fields_file_path
+            )
 
         # Print best solution and the features selected
         sol_str = ''.join(map(str, best_solution))

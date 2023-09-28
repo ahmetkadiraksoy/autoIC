@@ -6,12 +6,17 @@ from sklearn.svm import SVC, LinearSVC
 from sklearn.neural_network import MLPClassifier
 from libraries import log
 import csv
+import sys
 
 def load_csv(file_path):
-    with open(file_path, 'r') as f: # Open the CSV file for reading
-        reader = csv.reader(f) # Create a CSV reader object
-        data = [next(reader)] + [[float(token) for token in row] for row in reader] # read the header as string and the rest as float
-    return data
+    try:
+        with open(file_path, 'r') as f: # Open the CSV file for reading
+            reader = csv.reader(f) # Create a CSV reader object
+            data = [next(reader)] + [[float(token) for token in row] for row in reader] # read the header as string and the rest as float
+        return data
+    except FileNotFoundError:
+        print(f"The file {file_path} does not exist.")
+        sys.exit(1)
 
 def remove_duplicates_list_list(list_of_lists):
     unique_sublists = set(tuple(sublist) for sublist in list_of_lists[1:]) # Convert all sublists except the first one to tuples (which are hashable)
@@ -70,6 +75,6 @@ def classify_after_filtering(solution, fitness_function_file_paths, test_file_pa
     f1_score_average, predictions, test_labels = classify(train, test, classifier_index) # Classify and evaluate
 
     # Log results
-    log("\nAccuracy: " + str(f1_score_average), log_file_path)
+    log("\nF1-Score: " + str(f1_score_average), log_file_path)
     log("\nClassification Report:", log_file_path)
     log(classification_report(test_labels, predictions, zero_division=0), log_file_path)

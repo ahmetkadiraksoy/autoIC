@@ -3,9 +3,9 @@ from optimization import load_csv_and_filter, evaluate_fitness
 from libraries import log
 import random
 import threading
-import csv
 import json
 import multiprocessing
+import sys
 
 # Define a lock for synchronization
 thread_lock = threading.Lock()
@@ -15,8 +15,12 @@ def ant_colony_optimization(num_of_ants, num_of_iterations, pheromone_decay, phe
     pre_solutions = defaultdict(float)
 
     # Load classes
-    with open(classes_file_path, 'r') as file:
-        classes = json.loads(file.readline())
+    try:
+        with open(classes_file_path, 'r') as file:
+            classes = json.loads(file.readline())
+    except FileNotFoundError:
+        print(f"The file {classes_file_path} does not exist.")
+        sys.exit(1)
 
     # Load the packets
     log("loading packets...", log_file_path)
@@ -24,10 +28,13 @@ def ant_colony_optimization(num_of_ants, num_of_iterations, pheromone_decay, phe
     packets_2 = []
 
     # Read header from fields file
-    with open(fields_file_path, 'r') as file:
-        header = file.readline().strip().split(',') + ['label']
-        packets_1.append(header)
-        packets_2.append(header)
+    try:
+        with open(fields_file_path, 'r') as file:
+            header = file.readline().strip().split(',') + ['label']
+            packets_1.append(header)
+            packets_2.append(header)
+    except FileNotFoundError:
+        print(f"The file {fields_file_path} does not exist.")        
 
     packets_1.extend(element for element in load_csv_and_filter(classes, train_file_paths[0], num_of_packets_to_process, log_file_path))
     packets_2.extend(element for element in load_csv_and_filter(classes, train_file_paths[1], num_of_packets_to_process, log_file_path))
@@ -109,8 +116,11 @@ def run(train_file_paths, classifier_index, classes_file_path, num_of_packets_to
     pheromone_decay = 0.5
 
     # Determine solution size (number of features)
-    with open(train_file_paths[0], 'r') as file:
-        solution_size = len(file.readline().split(',')) - 1
+    try:
+        with open(train_file_paths[0], 'r') as file:
+            solution_size = len(file.readline().split(',')) - 1
+    except FileNotFoundError:
+        print(f"The file {train_file_paths[0]} does not exist.")
 
     return ant_colony_optimization(
         num_of_ants, num_of_iterations, pheromone_decay, pheromone_strength, train_file_paths,
