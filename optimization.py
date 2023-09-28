@@ -31,7 +31,7 @@ def evaluate_fitness(solution, packets_1, packets_2, classifier_index, pre_solut
 
     # Calculate feature accuracy
     num_selected_features = sum(solution)
-    total_features = len(solution) - 1  # Excluding the class column
+    total_features = len(solution)  # Excluding the class column
     feature_accuracy = 1 - ((num_selected_features - 1) / total_features)
 
     # Calculate fitness as a weighted combination of average accuracy and feature accuracy
