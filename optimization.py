@@ -7,10 +7,14 @@ import random
 
 def evaluate_fitness(solution, packets_1, packets_2, classifier_index, pre_solutions, weights):
     pre_solutions_gen = defaultdict(float)
+    n = len(solution)
+    k = sum(solution)
 
     # If no features are to be selected
-    if sum(solution) == 0:
+    if k == 0:
         return 0.0, pre_solutions_gen
+    elif n == 1:
+        return 1.0, pre_solutions_gen
 
     key = ''.join(map(str, solution))
 
@@ -30,9 +34,7 @@ def evaluate_fitness(solution, packets_1, packets_2, classifier_index, pre_solut
     average_accuracy = np.mean([fitness_1, fitness_2])
 
     # Calculate feature accuracy
-    num_selected_features = sum(solution)
-    total_features = len(solution)  # Excluding the class column
-    feature_accuracy = 1 - ((num_selected_features - 1) / total_features)
+    feature_accuracy = (n - k) / (n - 1)
 
     # Calculate fitness as a weighted combination of average accuracy and feature accuracy
     fitness = weights[0] * average_accuracy + weights[1] * feature_accuracy

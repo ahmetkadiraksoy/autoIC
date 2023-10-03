@@ -26,7 +26,7 @@ def uniform_crossover(parent1, parent2, crossover_rate):
 def mutate(solution, mutation_rate):
     return [bit if random.random() >= mutation_rate else 1 - bit for bit in solution] # Apply bit-flip mutation with a given mutation rate
 
-def genetic_algorithm(pop_size, solution_size, mutation_rate, crossover_rate, train_file_paths,classifier_index, num_of_iterations, classes_file_path, num_of_packets_to_process, weights, log_file_path, max_num_of_generations, fields_file_path):
+def genetic_algorithm(pop_size, solution_size, mutation_rate, crossover_rate, train_file_paths,classifier_index, num_of_iterations, classes_file_path, num_of_packets_to_process, weights, log_file_path, max_num_of_generations, fields_file_path, num_cores):
     pre_solutions = defaultdict(float)
     
     # Load classes
@@ -77,7 +77,6 @@ def genetic_algorithm(pop_size, solution_size, mutation_rate, crossover_rate, tr
             population = new_population # Replace the old population with the new population
         
         # Evaluate the fitness of each solution in the population using multi-threading
-        num_cores = multiprocessing.cpu_count() - 1 # Determine the number of CPU cores minus 1
         with multiprocessing.Pool(processes=num_cores) as pool:
             results = pool.starmap(evaluate_fitness, [(solution, packets_1, packets_2, classifier_index, pre_solutions, weights) for solution in population])
 
@@ -108,7 +107,7 @@ def genetic_algorithm(pop_size, solution_size, mutation_rate, crossover_rate, tr
 
     return (best_solution, best_fitness)
 
-def run(train_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations, weights, log_file_path, max_num_of_generations, fields_file_path):
+def run(train_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations, weights, log_file_path, max_num_of_generations, fields_file_path, num_cores):
     # Configuration parameters
     population_size = 50
     mutation_rate = 0.015
@@ -125,5 +124,5 @@ def run(train_file_paths, classifier_index, classes_file_path, num_of_packets_to
     return genetic_algorithm(
         population_size, solution_size, mutation_rate, crossover_rate, train_file_paths,
         classifier_index, num_of_iterations, classes_file_path, num_of_packets_to_process,
-        weights, log_file_path, max_num_of_generations, fields_file_path
+        weights, log_file_path, max_num_of_generations, fields_file_path, num_cores
     )

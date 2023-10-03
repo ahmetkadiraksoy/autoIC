@@ -1,3 +1,4 @@
+import multiprocessing
 from libraries import log
 import pandas as pd
 import subprocess
@@ -6,8 +7,7 @@ import sys
 import os
 import re
 import ga
-import ml
-import aco
+import ml, aco, bee
 import json
 import statistics
 
@@ -182,7 +182,7 @@ def write_packets_to_csv_files(csv_file_paths, num_of_lines_per_file, csv_data):
                 csv_line = ','.join(line)
                 f.write(f"{csv_line}\n")
 
-def extract_features_from_pcap(blacklist_file_path, feature_names_file_path, protocol_folder_path, csv_file_paths, pcap_file_names, pcap_file_paths, classes_file_path, selected_field_list_file_path, statistical_features_on):
+def extract_features_from_pcap(blacklist_file_path, feature_names_file_path, protocol_folder_path, csv_file_paths, pcap_file_names, pcap_file_paths, classes_file_path, selected_field_list_file_path, statistical_features_on, tshark_filter):
     # Create protocol folder
     if not os.path.exists(protocol_folder_path):
         os.makedirs(protocol_folder_path)
@@ -210,7 +210,10 @@ def extract_features_from_pcap(blacklist_file_path, feature_names_file_path, pro
         print("processing " + pcap_file_name + "...")
 
         # Prepare the tshark command to be executed
-        tshark_cmd = ['tshark', '-r', pcap_file_path, '-T', 'fields']
+        tshark_cmd = ['tshark', '-n', '-r', pcap_file_path, '-T', 'fields']
+        if (tshark_filter != ""):
+            tshark_cmd.append('-Y')
+            tshark_cmd.append(tshark_filter)
         for feature in csv_header[:-1]:
             tshark_cmd.append('-e')
             tshark_cmd.append(feature)
@@ -293,7 +296,7 @@ if __name__ == '__main__':
 
     # Variables
     classifier_index = 0
-    max_num_of_generations = 50
+    max_num_of_generations = 100
     num_of_iterations = 10
     num_of_packets_to_process = 0
     order_of_batches = [1,2,3]
@@ -302,6 +305,8 @@ if __name__ == '__main__':
     mode = ""
     folder = ""
     protocol = ""
+    tshark_filter = ""
+    num_cores = multiprocessing.cpu_count() - 1 # Determine the number of CPU cores minus 1
     statistical_features_on = False
 
     # Loop through command-line arguments starting from the second element
@@ -313,6 +318,13 @@ if __name__ == '__main__':
                 sys.exit(1)
 
             protocol = sys.argv[index + 1]
+            index += 2  # Skip both the option and its value
+        elif sys.argv[index] in ('-t', '--tshark-filter'):
+            if index + 1 >= len(sys.argv):
+                print("Missing value for -t/--tshark-filter option")
+                sys.exit(1)
+
+            tshark_filter = sys.argv[index + 1]
             index += 2  # Skip both the option and its value
         elif sys.argv[index] in ('-b', '--batch'):
             if index + 1 >= len(sys.argv):
@@ -348,6 +360,13 @@ if __name__ == '__main__':
                 sys.exit(1)
 
             num_of_packets_to_process = int(sys.argv[index + 1])
+            index += 2  # Skip both the option and its value
+        elif sys.argv[index] in ('-nc', 'num-cores'):
+            if index + 1 >= len(sys.argv):
+                print("Missing value for -nc/--num-cores option")
+                sys.exit(1)
+
+            num_cores = int(sys.argv[index + 1])
             index += 2  # Skip both the option and its value
         elif sys.argv[index] in ('-f', '--folder'):
             if index + 1 >= len(sys.argv):
@@ -435,9 +454,9 @@ if __name__ == '__main__':
         extract_features_from_pcap(
             blacklist_file_path, feature_names_file_path, protocol_folder_path,
             csv_file_paths, pcap_file_names, pcap_file_paths, classes_file_path,
-            selected_field_list_file_path, statistical_features_on
+            selected_field_list_file_path, statistical_features_on, tshark_filter
         )
-    elif mode == 'ga' or mode == 'aco':
+    elif mode == 'ga' or mode == 'aco' or mode == 'abc':
         train_file_paths.append(f'{folder}{protocol}/batch_{order_of_batches[0]}.csv')
         train_file_paths.append(f'{folder}{protocol}/batch_{order_of_batches[1]}.csv')
         test_file_path = f'{folder}{protocol}/batch_{order_of_batches[2]}.csv'
@@ -448,14 +467,23 @@ if __name__ == '__main__':
             best_solution, best_fitness = ga.run(
                 train_file_paths, classifier_index, classes_file_path,
                 num_of_packets_to_process, num_of_iterations, weights,
-                log_file_path, max_num_of_generations, fields_file_path
+                log_file_path, max_num_of_generations, fields_file_path,
+                num_cores
             )
         elif mode == 'aco':
             log("running ACO...\n", log_file_path)
             best_solution, best_fitness = aco.run(
                 train_file_paths, classifier_index, classes_file_path,
                 num_of_packets_to_process, num_of_iterations, weights,
-                log_file_path, max_num_of_generations, fields_file_path
+                log_file_path, max_num_of_generations, fields_file_path,
+                num_cores
+            )
+        elif mode == 'abc':
+            log("running ABC...\n", log_file_path)
+            best_solution, best_fitness = bee.run(
+                train_file_paths, train_file_paths, classifier_index,
+                classes_file_path, num_of_packets_to_process, num_of_iterations,
+                weights, log_file_path, fields_file_path, num_cores
             )
 
         # Print best solution and the features selected

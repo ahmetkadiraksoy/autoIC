@@ -11,7 +11,7 @@ import sys
 thread_lock = threading.Lock()
 
 # Define the ACO algorithm
-def ant_colony_optimization(num_of_ants, num_of_iterations, pheromone_decay, pheromone_strength, train_file_paths, classifier_index, solution_size, classes_file_path, num_of_packets_to_process, weights, log_file_path, max_num_of_generations, fields_file_path):
+def ant_colony_optimization(num_of_ants, num_of_iterations, pheromone_decay, pheromone_strength, train_file_paths, classifier_index, solution_size, classes_file_path, num_of_packets_to_process, weights, log_file_path, max_num_of_generations, fields_file_path, num_cores):
     pre_solutions = defaultdict(float)
 
     # Load classes
@@ -62,7 +62,6 @@ def ant_colony_optimization(num_of_ants, num_of_iterations, pheromone_decay, phe
         threads = []
         solutions = [[random.randint(0, 1) for _ in range(solution_size)] for _ in range(num_of_ants)]
 
-        num_cores = multiprocessing.cpu_count() - 1 # Determine the number of CPU cores minus 1
         with multiprocessing.Pool(processes=num_cores) as pool:
             results = pool.starmap(evaluate_fitness, [(solution, packets_1, packets_2, classifier_index, pre_solutions, weights) for solution in solutions])
 
@@ -109,7 +108,7 @@ def ant_colony_optimization(num_of_ants, num_of_iterations, pheromone_decay, phe
     # Return the best solution and its fitness value
     return (best_solution, best_fitness)
 
-def run(train_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations, weights, log_file_path, max_num_of_generations, fields_file_path):
+def run(train_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations, weights, log_file_path, max_num_of_generations, fields_file_path, num_cores):
     # Configuration parameters
     num_of_ants = 10
     pheromone_strength = 1
@@ -125,5 +124,5 @@ def run(train_file_paths, classifier_index, classes_file_path, num_of_packets_to
     return ant_colony_optimization(
         num_of_ants, num_of_iterations, pheromone_decay, pheromone_strength, train_file_paths,
         classifier_index, solution_size, classes_file_path, num_of_packets_to_process, weights,
-        log_file_path, max_num_of_generations, fields_file_path
+        log_file_path, max_num_of_generations, fields_file_path, num_cores
     )
