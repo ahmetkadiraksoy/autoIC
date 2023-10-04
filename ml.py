@@ -45,7 +45,7 @@ def train_and_evaluate_classifier(classifier_index, train_features, train_labels
     clf = classifiers[classifier_index]
     clf.fit(train_features, train_labels)
     predictions = clf.predict(test_features)
-    f1 = f1_score(test_labels, predictions, average='weighted')
+    f1 = f1_score(test_labels, predictions, average='macro')
 
     return f1, predictions, test_labels
 
