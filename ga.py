@@ -1,10 +1,16 @@
 from collections import defaultdict
+import math
+
+import numpy as np
 from optimization import load_csv_and_filter, evaluate_fitness
 from libraries import log
 import random
 import sys
 import json
 import multiprocessing
+
+# Set a random seed for reproducibility
+random.seed(42)
 
 def initialize_population(pop_size, solution_size):
     # Initialize a population of random binary solutions using list comprehension
@@ -59,8 +65,9 @@ def genetic_algorithm(pop_size, solution_size, mutation_rate, crossover_rate, tr
 
     population = initialize_population(pop_size, solution_size)
     best_solution = None
+    best_fitness = -math.inf
 
-    consecutive_same_solution_count = 0
+    consecutive_same_solution_count = 1
     generation = 0
 
     while consecutive_same_solution_count < num_of_iterations and generation < max_num_of_generations:
@@ -88,24 +95,27 @@ def genetic_algorithm(pop_size, solution_size, mutation_rate, crossover_rate, tr
             fitness_scores.append(result[0])
             pre_solutions.update(result[1])
 
-        # Track and display the best solution in this generation
-        new_best_solution = population[fitness_scores.index(max(fitness_scores))]
-        if best_solution == new_best_solution:
+        # Find the best solution in the current generation
+        generation_best_index = np.argmax(fitness_scores)
+        generation_best_fitness = fitness_scores[generation_best_index]
+        generation_best_solution = population[generation_best_index]
+
+        # Track and display the best solution in this generation            
+        if generation_best_fitness > best_fitness:
+            best_solution = generation_best_solution
+            best_fitness = generation_best_fitness
+            consecutive_same_solution_count = 1
+        elif generation_best_fitness == best_fitness:
             consecutive_same_solution_count += 1
-        else:
-            best_solution = new_best_solution
-            consecutive_same_solution_count = 0
 
         sol_str = ''.join(map(str, best_solution))
-        log(f"Generation {generation + 1}:\t[{sol_str}]\t[{sol_str.count('1')}/{len(sol_str)}]\tFitness: {max(fitness_scores)}", log_file_path)
+        log(f"Generation {generation + 1}:\t[{sol_str}]\t[{sol_str.count('1')}/{len(sol_str)}]\tFitness: {best_fitness}", log_file_path)
         
         generation += 1
 
     log("", log_file_path)
-    key = ''.join(map(str, best_solution))
-    best_fitness = pre_solutions[key]
 
-    return (best_solution, best_fitness)
+    return best_solution, best_fitness
 
 def run(train_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations, weights, log_file_path, max_num_of_generations, fields_file_path, num_cores):
     # Configuration parameters

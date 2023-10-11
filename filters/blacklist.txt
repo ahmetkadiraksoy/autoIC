@@ -73,3 +73,14 @@ tls.quic.parameter.vn.supported_version
 tls.quic.parameter.vn.supported_version_count
 tls.quic.supported_versions
 tls.quic.supported_versions.len
+tcp.stream
+udp.checksum
+udp.checksum.bad
+udp.checksum.status
+udp.checksum.zero
+udp.checksum_bad
+udp.checksum_bad.expert
+udp.checksum_calculated
+udp.checksum_coverage.expert
+udp.checksum_good
+udp.stream

@@ -141,12 +141,13 @@ def remove_empty_fields_from_csv_files(csv_file_paths):
     columns_to_remove = set()
 
     # Check if each common column has only one unique value across all DataFrames
-    for col in common_columns:
+    for idx, col in enumerate(common_columns):
         common_values = set(dfs[0][col].unique())
         for df in dfs[1:]:
             common_values &= set(df[col].unique())
         if len(common_values) == 1:
-            columns_to_remove.add(col)
+            if idx < len(common_columns) - 1: # ignore the label being removed
+                columns_to_remove.add(col)
 
     if columns_to_remove:
         print("removing empty fields...")
@@ -260,23 +261,26 @@ def extract_features_from_pcap(blacklist_file_path, feature_names_file_path, pro
 
 def print_usage():
     """Print a usage guide for the program."""
-    print("Usage: python autoIC.py [options]")
+    print("Usage: python script.py [options]")
     print("Options:")
-    print("  -p, --protocol    Specify the protocol (e.g., http, ftp)")
-    print("  -b, --batch       Specify a comma-separated list of batch orders")
-    print("  -i, --iteration   Specify the number of iterations")
-    print("  -g, --generation  Specify the maximum number of generations")
-    print("  -w, --weights     Specify weights as a comma-separated list")
-    print("  -n                Specify the number of packets to process")
-    print("  -f, --folder      Specify the folder path")
-    print("  -l, --log         Specify the log file path")
-    print("  -e, --extract     Set the mode to 'extract'")
-    print("  -m, --mode        Specify the mode (e.g., 'mode1', 'mode2')")
-    print("  -c, --classifier  Specify the classifier index (integer)")
-    print("  -h, --help        Display this help message")
+    print("  -p, --protocol    Specify the protocol for data extraction")
+    print("  -t, --tshark-filter    Specify the Wireshark (tshark) display filter for extraction")
+    print("  -b, --batch        Specify the order of data batches (comma-separated, e.g., 1,2,3)")
+    print("  -i, --iteration    Specify the number of iterations (default: 10)")
+    print("  -g, --generation   Specify the number of generations (default: 100)")
+    print("  -w, --weights      Specify the weights for multi-objective optimization (comma-separated, e.g., 0.9,0.1)")
+    print("  -n                Specify the number of packets to process (default: 0, process all packets)")
+    print("  -nc, --num-cores   Specify the number of CPU cores to use (default: all available cores - 1)")
+    print("  -f, --folder       Specify the workspace folder")
+    print("  -l, --log          Specify the log file path (default: log.txt)")
+    print("  -e, --extract      Run data extraction mode")
+    print("  -s, --statistics   Enable statistical features extraction")
+    print("  -m, --mode         Specify the optimization mode (ga, aco, abc)")
+    print("  -c, --classifier   Specify the classifier index for machine learning (default: 0)")
+    print("  -h, --help         Show this help message")
     print()
     print("Example:")
-    print("python autoIC.py -p http -b batch1,batch2 -i 100 -g 10 -w 0.5,0.3 -n 50 -f /path/to/folder -l logfile.txt -e -m mode1 -c 0")
+    print("python script.py -p http -b 1,2,3 -i 10 -g 100 -w 0.9,0.1 -n 50 -f /path/to/folder -l log.txt -e -m ga -c 0")
     print()
     print("Note:")
     print("- Use commas to separate multiple values for options that accept lists (e.g., -b, -w).")
@@ -481,9 +485,10 @@ if __name__ == '__main__':
         elif mode == 'abc':
             log("running ABC...\n", log_file_path)
             best_solution, best_fitness = bee.run(
-                train_file_paths, train_file_paths, classifier_index,
-                classes_file_path, num_of_packets_to_process, num_of_iterations,
-                weights, log_file_path, fields_file_path, num_cores
+                train_file_paths, classifier_index, classes_file_path,
+                num_of_packets_to_process, num_of_iterations, weights,
+                log_file_path, max_num_of_generations, fields_file_path,
+                num_cores
             )
 
         # Print best solution and the features selected

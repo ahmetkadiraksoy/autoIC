@@ -1,32 +1,74 @@
 from collections import defaultdict
-import multiprocessing
 from optimization import load_csv_and_filter, evaluate_fitness
 from libraries import log
 import random
 import sys
 import json
+import multiprocessing
+import random
+import numpy as np
+import math
 
-def initialize_solution(solution_size):
-    # Helper function to initialize a random solution
-    return [random.randint(0, 1) for _ in range(solution_size)]
+# Set a random seed for reproducibility
+random.seed(42)
+np.random.seed(42)
 
-def generate_neighbor_solution(solution):
-    # Helper function to generate a neighbor solution by flipping a random bit
-    neighbor_solution = solution.copy()
-    index_to_flip = random.randint(0, len(neighbor_solution) - 1)
-    neighbor_solution[index_to_flip] = 1 - neighbor_solution[index_to_flip]
-    return neighbor_solution
+# Define the objective function for feature selection
+def objective_function(features):
+    return sum(features)
 
-def artificial_bee_colony(solution_size, num_of_iterations, train_file_paths, classifier_index, num_of_packets_to_process, weights, log_file_path, fields_file_path, num_of_employed_bees, num_of_onlooker_bees, num_of_scout_bees, classes_file_path, num_cores):
+# Initialize the population of solutions (bees)
+def initialize_population(pop_size, num_features):
+    return [[random.choice([0, 1]) for _ in range(num_features)] for _ in range(pop_size)]
+
+# Select employed bees to explore new solutions
+def employed_bees_phase(population, fitness_scores, max_trials):
+    new_population = []
+    for i, solution in enumerate(population):
+        trial_count = 0
+        while trial_count < max_trials:
+            neighbor_index = random.randint(0, len(population) - 1)
+            if neighbor_index == i:
+                continue
+            j = random.randint(0, len(solution) - 1)
+            new_solution = solution.copy()
+            new_solution[j] = 1 - new_solution[j]
+            if objective_function(new_solution) > fitness_scores[i]:
+                solution = new_solution
+            trial_count += 1
+        new_population.append(solution)
+    return new_population
+
+def onlooker_bees_phase(population, fitness_scores):
+    total_fitness = sum(fitness_scores)
+    probabilities = [fit / total_fitness for fit in fitness_scores]
+    pop_size = len(population)
+    new_population = population.copy()  # Create a copy of the population
+
+    for _ in range(pop_size):
+        selected_bee_index = np.random.choice(pop_size, p=probabilities)
+        selected_bee = new_population[selected_bee_index]
+        j = random.randint(0, len(selected_bee) - 1)
+        selected_bee[j] = 1 - selected_bee[j] # Flip the feature
+        if objective_function(selected_bee) <= fitness_scores[selected_bee_index]: # If new solution is worse, revert the change
+            selected_bee[j] = 1 - selected_bee[j]
+
+    return new_population
+
+# Select scout bees to replace abandoned solutions
+def scout_bees_phase(population, max_trials):
+    return [[random.choice([0, 1]) for _ in range(len(solution))] if random.random() < 1 / (1 + max_trials) else solution for solution in population]
+
+# ABC feature selection algorithm
+def abc_feature_selection(population_size, solution_size, max_trials, num_cores, log_file_path, classes_file_path, train_file_paths, num_of_packets_to_process, fields_file_path, classifier_index, weights, num_of_iterations, max_num_of_generations):
     pre_solutions = defaultdict(float)
-    
+
     # Load classes
     try:
         with open(classes_file_path, 'r') as file:
             classes = json.loads(file.readline())
     except FileNotFoundError:
-        print(f"The file {classes_file_path} does not exist.")
-        sys.exit(1)
+        raise FileNotFoundError(f"The file {classes_file_path} does not exist.")
 
     # Load the packets
     log("loading packets...", log_file_path)
@@ -48,89 +90,67 @@ def artificial_bee_colony(solution_size, num_of_iterations, train_file_paths, cl
 
     log("", log_file_path)
 
-    # Initialize employed bees with random solutions
-    employed_bees = [initialize_solution(solution_size) for _ in range(num_of_employed_bees)]
+    population = initialize_population(population_size, solution_size)
     best_solution = None
-    best_fitness = None
+    best_fitness = -math.inf
 
-    consecutive_same_solution_count = 0
+    fitness_scores = [-math.inf for _ in range(population_size)]
+
+    consecutive_same_solution_count = 1
     generation = 0
 
-    while consecutive_same_solution_count < num_of_iterations:
-        neighbor_bees = [generate_neighbor_solution(employed_bees[i]) for i in range(num_of_employed_bees)]
+    while consecutive_same_solution_count < num_of_iterations and generation < max_num_of_generations:
+        if best_solution is not None:
+            employed_population = employed_bees_phase(population, fitness_scores, max_trials)
+            onlooker_population = onlooker_bees_phase(employed_population, fitness_scores)
+            population = scout_bees_phase(onlooker_population, max_trials)
+            population[-1] = best_solution # Preserve the best solution from the previous generation
 
-        # Precompute fitness values for all employed bees
+        # Evaluate the fitness of each solution in the population using multi-threading
         with multiprocessing.Pool(processes=num_cores) as pool:
-            results_precompute = pool.starmap(evaluate_fitness, [(solution, packets_1, packets_2, classifier_index, pre_solutions, weights) for solution in employed_bees])
+            results = pool.starmap(evaluate_fitness, [(solution, packets_1, packets_2, classifier_index, pre_solutions, weights) for solution in population])
 
         pool.close()
         pool.join()
 
-        employed_bees_fitness = []
-        for result in results_precompute:
-            employed_bees_fitness.append(result[0])
+        fitness_scores = []
+        for result in results:
+            fitness_scores.append(result[0])
+            pre_solutions.update(result[1])
 
-        with multiprocessing.Pool(processes=num_cores) as pool:
-            results_employed = pool.starmap(evaluate_fitness, [(solution, packets_1, packets_2, classifier_index, pre_solutions, weights) for solution in neighbor_bees])
+        # Find the best solution in the current generation
+        generation_best_index = np.argmax(fitness_scores)
+        generation_best_fitness = fitness_scores[generation_best_index]
+        generation_best_solution = population[generation_best_index]
 
-        pool.close()
-        pool.join()
+        # Track and display the best solution in this generation
+        if generation_best_fitness > best_fitness:
+            best_solution = generation_best_solution
+            best_fitness = generation_best_fitness
+            consecutive_same_solution_count = 1
+        elif generation_best_fitness == best_fitness:
+            consecutive_same_solution_count += 1
 
-        neighbor_solution_fitness = []
-        for result in results_employed:
-            neighbor_solution_fitness.append(result[0])
-
-        # Employed bees phase: Search for new solutions
-        for i in range(num_of_employed_bees):
-            if neighbor_solution_fitness[i] > employed_bees_fitness[i]:
-                employed_bees[i] = neighbor_bees[i]
-                employed_bees_fitness[i] = neighbor_solution_fitness[i]
-
-        # Onlooker bees phase: Select solutions to follow
-        onlooker_bees = []
-        total_fitness = sum(employed_bees_fitness)
-
-        for i in range(num_of_onlooker_bees):
-            roulette_wheel = random.uniform(0, total_fitness)
-            cum_fitness = 0
-            for j in range(num_of_employed_bees):
-                cum_fitness += employed_bees_fitness[j]
-                if cum_fitness >= roulette_wheel:
-                    onlooker_bees.append(employed_bees[j])
-                    break
-
-        # Scout bees phase: Replace solutions with low fitness
-        for i in range(num_of_scout_bees):
-            solution = initialize_solution(solution_size)
-            employed_bees[random.randint(0, num_of_employed_bees - 1)] = solution
-
-        # Evaluate fitness for the best solution and display results
-        best_solution_index = employed_bees_fitness.index(max(employed_bees_fitness))
-        best_solution = employed_bees[best_solution_index]
-
-        best_fitness = employed_bees_fitness[best_solution_index]
         sol_str = ''.join(map(str, best_solution))
-
         log(f"Generation {generation + 1}:\t[{sol_str}]\t[{sol_str.count('1')}/{len(sol_str)}]\tFitness: {best_fitness}", log_file_path)
 
         generation += 1
 
     log("", log_file_path)
 
-    return (best_solution, best_fitness)
+    return best_solution, best_fitness
 
-def run(train_file_paths, fitness_function_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations, weights, log_file_path, fields_file_path, num_cores):
-    num_of_employed_bees = 10
-    num_of_onlooker_bees = 10
-    num_of_scout_bees = 10
+def run(train_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations, weights, log_file_path, max_num_of_generations, fields_file_path, num_cores):
+    # Configuration parameters
+    population_size = 50
+    max_trials = 5
 
     # Determine solution size (number of features)
-    with open(fitness_function_file_paths[0], 'r') as file:
-        solution_size = len(file.readline().split(',')) - 1
+    try:
+        with open(train_file_paths[0], 'r') as file:
+            solution_size = len(file.readline().split(',')) - 1
+    except FileNotFoundError:
+        print(f"The file {train_file_paths[0]} does not exist.")
+        sys.exit(1)
 
-    return artificial_bee_colony(
-        solution_size, num_of_iterations, train_file_paths, classifier_index,
-        num_of_packets_to_process, weights, log_file_path, fields_file_path,
-        num_of_employed_bees, num_of_onlooker_bees, num_of_scout_bees,
-        classes_file_path, num_cores)
-
+    return abc_feature_selection(population_size, solution_size, max_trials, num_cores, log_file_path, classes_file_path, train_file_paths, num_of_packets_to_process, fields_file_path, classifier_index, weights, num_of_iterations, max_num_of_generations)
