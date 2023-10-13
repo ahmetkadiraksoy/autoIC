@@ -305,11 +305,12 @@ if __name__ == '__main__':
     num_of_packets_to_process = 0
     order_of_batches = [1,2,3]
     weights = [0.9,0.1]
-    log_file_path = "log.txt"
+    log_file_path = ""
     mode = ""
     folder = ""
     protocol = ""
     tshark_filter = ""
+    run_number = 0
     num_cores = multiprocessing.cpu_count() - 1 # Determine the number of CPU cores minus 1
     statistical_features_on = False
 
@@ -335,7 +336,7 @@ if __name__ == '__main__':
                 print("Missing value for -b/--batch option")
                 sys.exit(1)
             
-            order_of_batches = sys.argv[index + 1].split(',')
+            order_of_batches = list(map(int, sys.argv[index + 1].split(',')))
             index += 2  # Skip both the option and its value
         elif sys.argv[index] in ('-i', '--iteration'):
             if index + 1 >= len(sys.argv):
@@ -379,6 +380,13 @@ if __name__ == '__main__':
 
             folder = fix_trailing_character(sys.argv[index + 1])
             index += 2  # Skip both the option and its value
+        elif sys.argv[index] in ('-r', '--run-number'):
+            if index + 1 >= len(sys.argv):
+                print("Missing value for -r/--run-number option")
+                sys.exit(1)
+
+            run_number = int(sys.argv[index + 1])
+            index += 2  # Skip both the option and its value
         elif sys.argv[index] in ('-l', '--log'):
             if index + 1 >= len(sys.argv):
                 print("Missing value for -f/--folder option")
@@ -414,6 +422,23 @@ if __name__ == '__main__':
             sys.exit(1)
 
     # Set parameters and perform validation checks
+    if log_file_path == "":
+        batch_number = 0
+        if order_of_batches == [1,2,3] or order_of_batches == [2,1,3]:
+            batch_number = 1
+        elif order_of_batches == [1,3,2] or order_of_batches == [3,1,2]:
+            batch_number = 2
+        elif order_of_batches == [2,3,1] or order_of_batches == [3,2,1]:
+            batch_number = 3
+        log_file_path = (
+            "packets_" + str(num_of_packets_to_process) +
+            "_mode_" + str(mode) +
+            "_clf_" + str(classifier_index) +
+            "_batch_" + str(batch_number) +
+            ("_run_" + str(run_number) if run_number > 0 else "") +
+            ".txt"
+        )
+
     if folder == "":
         print("Workspace folder not given!")
         sys.exit(1)
