@@ -1,9 +1,4 @@
 from sklearn.metrics import classification_report, f1_score
-from sklearn.naive_bayes import GaussianNB
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.svm import SVC, LinearSVC
-from sklearn.neural_network import MLPClassifier
 from libraries import log
 import csv
 import sys
@@ -28,28 +23,18 @@ def extract_features_and_labels(data, label_column_index):
     labels = [row[label_column_index] for row in data] # Extract labels by selecting the label column from each row
     return features, labels
 
-def train_and_evaluate_classifier(classifier_index, train_features, train_labels, test_features, test_labels):
-    # List of classifiers to test
-    classifiers = [
-        DecisionTreeClassifier(random_state=42),
-        RandomForestClassifier(random_state=42),
-        SVC(random_state=42),
-        LinearSVC(random_state=42, dual='auto', C=1.0, max_iter=10000),
-        MLPClassifier(hidden_layer_sizes=(50, 10), max_iter=1000, random_state=42),
-        GaussianNB()
-    ]
-
+def train_and_evaluate_classifier(classifier_index, train_features, train_labels, test_features, test_labels, classifiers):
     if classifier_index < 0 or classifier_index >= len(classifiers):
             raise ValueError("Invalid classifier index")
 
-    clf = classifiers[classifier_index]
+    clf = classifiers[classifier_index][1]
     clf.fit(train_features, train_labels)
     predictions = clf.predict(test_features)
     f1 = f1_score(test_labels, predictions, average='macro')
 
     return f1, predictions, test_labels
 
-def classify(train, test, classifier_index):
+def classify(train, test, classifier_index, classifiers):
     try:
         label_column_index = train[0].index('label') # Find the index of the label column in the header
 
@@ -58,11 +43,11 @@ def classify(train, test, classifier_index):
         test_features, test_labels = extract_features_and_labels(test[1:], label_column_index)
 
         # Train and evaluate the classifier
-        return train_and_evaluate_classifier(classifier_index, train_features, train_labels, test_features, test_labels)
+        return train_and_evaluate_classifier(classifier_index, train_features, train_labels, test_features, test_labels, classifiers)
     except ValueError as e:
         print(f"Error: {e}")
 
-def classify_after_filtering(solution, fitness_function_file_paths, test_file_path, classifier_index, log_file_path, filter):
+def classify_after_filtering(solution, fitness_function_file_paths, test_file_path, classifier_index, log_file_path, classifiers, filter):
     # Load training and testing data, remove duplicates (fitness_function_file_paths[1] except for header)
     train = remove_duplicates_list_list(load_csv(fitness_function_file_paths[0]) + load_csv(fitness_function_file_paths[1])[1:])
     test = remove_duplicates_list_list(load_csv(test_file_path))
@@ -72,7 +57,7 @@ def classify_after_filtering(solution, fitness_function_file_paths, test_file_pa
         train = [[col for col, m in zip(row, solution_new) if m] for row in train]
         test = [[col for col, m in zip(row, solution_new) if m] for row in test]
 
-    f1_score_average, predictions, test_labels = classify(train, test, classifier_index) # Classify and evaluate
+    f1_score_average, predictions, test_labels = classify(train, test, classifier_index, classifiers) # Classify and evaluate
 
     # Log results
     log("\nF1-Score: " + str(f1_score_average), log_file_path)

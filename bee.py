@@ -60,7 +60,7 @@ def scout_bees_phase(population, max_trials):
     return [[random.choice([0, 1]) for _ in range(len(solution))] if random.random() < 1 / (1 + max_trials) else solution for solution in population]
 
 # ABC feature selection algorithm
-def abc_feature_selection(population_size, solution_size, max_trials, num_cores, log_file_path, classes_file_path, train_file_paths, num_of_packets_to_process, fields_file_path, classifier_index, weights, num_of_iterations, max_num_of_generations):
+def abc_feature_selection(population_size, solution_size, max_trials, num_cores, log_file_path, classes_file_path, train_file_paths, num_of_packets_to_process, fields_file_path, classifier_index, weights, num_of_iterations, max_num_of_generations, classifiers):
     pre_solutions = defaultdict(float)
 
     # Load classes
@@ -108,7 +108,7 @@ def abc_feature_selection(population_size, solution_size, max_trials, num_cores,
 
         # Evaluate the fitness of each solution in the population using multi-threading
         with multiprocessing.Pool(processes=num_cores) as pool:
-            results = pool.starmap(evaluate_fitness, [(solution, packets_1, packets_2, classifier_index, pre_solutions, weights) for solution in population])
+            results = pool.starmap(evaluate_fitness, [(solution, packets_1, packets_2, classifier_index, pre_solutions, weights, classifiers) for solution in population])
 
         pool.close()
         pool.join()
@@ -140,7 +140,7 @@ def abc_feature_selection(population_size, solution_size, max_trials, num_cores,
 
     return best_solution, best_fitness
 
-def run(train_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations, weights, log_file_path, max_num_of_generations, fields_file_path, num_cores):
+def run(train_file_paths, classifier_index, classes_file_path, num_of_packets_to_process, num_of_iterations, weights, log_file_path, max_num_of_generations, fields_file_path, num_cores, classifiers):
     # Configuration parameters
     population_size = 50
     max_trials = 5
@@ -153,4 +153,8 @@ def run(train_file_paths, classifier_index, classes_file_path, num_of_packets_to
         print(f"The file {train_file_paths[0]} does not exist.")
         sys.exit(1)
 
-    return abc_feature_selection(population_size, solution_size, max_trials, num_cores, log_file_path, classes_file_path, train_file_paths, num_of_packets_to_process, fields_file_path, classifier_index, weights, num_of_iterations, max_num_of_generations)
+    return abc_feature_selection(
+        population_size, solution_size, max_trials, num_cores, log_file_path, classes_file_path,
+        train_file_paths, num_of_packets_to_process, fields_file_path, classifier_index, weights,
+        num_of_iterations, max_num_of_generations, classifiers
+    )

@@ -1,5 +1,10 @@
-import multiprocessing
+from sklearn.naive_bayes import GaussianNB
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.svm import SVC, LinearSVC
+from sklearn.neural_network import MLPClassifier
 from libraries import log
+import multiprocessing
 import pandas as pd
 import subprocess
 import csv
@@ -10,6 +15,7 @@ import ga
 import ml, aco, bee
 import json
 import statistics
+import report
 
 def is_numeric(input_string):
     try:
@@ -314,6 +320,16 @@ if __name__ == '__main__':
     num_cores = multiprocessing.cpu_count() - 1 # Determine the number of CPU cores minus 1
     statistical_features_on = False
 
+    # List of classifiers to test
+    classifiers = [
+        ("DT", DecisionTreeClassifier(random_state=42)),
+        ("RF", RandomForestClassifier(random_state=42)),
+        ("SVC", SVC(random_state=42)),
+        ("LiSVC", LinearSVC(random_state=42, dual='auto', C=1.0, max_iter=10000)),
+        ("MLP", MLPClassifier(hidden_layer_sizes=(50, 10), max_iter=1000, random_state=42)),
+        ("GNB", GaussianNB())
+    ]
+
     # Loop through command-line arguments starting from the second element
     index = 1
     while index < len(sys.argv):
@@ -396,6 +412,9 @@ if __name__ == '__main__':
             index += 2  # Skip both the option and its value
         elif sys.argv[index] in ('-e', '--extract'):
             mode = "extract"
+            index += 1
+        elif sys.argv[index] in ('-r', '--report'):
+            mode = "report"
             index += 1
         elif sys.argv[index] in ('-s', '--statistics'):
             statistical_features_on = True
@@ -485,6 +504,8 @@ if __name__ == '__main__':
             csv_file_paths, pcap_file_names, pcap_file_paths, classes_file_path,
             selected_field_list_file_path, statistical_features_on, tshark_filter
         )
+    elif mode == 'report':
+        report.run(folder + protocol, classifiers)
     elif mode == 'ga' or mode == 'aco' or mode == 'abc':
         train_file_paths.append(f'{folder}{protocol}/batch_{order_of_batches[0]}.csv')
         train_file_paths.append(f'{folder}{protocol}/batch_{order_of_batches[1]}.csv')
@@ -497,7 +518,7 @@ if __name__ == '__main__':
                 train_file_paths, classifier_index, classes_file_path,
                 num_of_packets_to_process, num_of_iterations, weights,
                 log_file_path, max_num_of_generations, fields_file_path,
-                num_cores
+                num_cores, classifiers
             )
         elif mode == 'aco':
             log("running ACO...\n", log_file_path)
@@ -505,7 +526,7 @@ if __name__ == '__main__':
                 train_file_paths, classifier_index, classes_file_path,
                 num_of_packets_to_process, num_of_iterations, weights,
                 log_file_path, max_num_of_generations, fields_file_path,
-                num_cores
+                num_cores, classifiers
             )
         elif mode == 'abc':
             log("running ABC...\n", log_file_path)
@@ -513,7 +534,7 @@ if __name__ == '__main__':
                 train_file_paths, classifier_index, classes_file_path,
                 num_of_packets_to_process, num_of_iterations, weights,
                 log_file_path, max_num_of_generations, fields_file_path,
-                num_cores
+                num_cores, classifiers
             )
 
         # Print best solution and the features selected
@@ -527,10 +548,10 @@ if __name__ == '__main__':
         # Print the classification result on test data using selected features
         log("", log_file_path)
         log("Selected feature-set results:", log_file_path)
-        ml.classify_after_filtering(best_solution, train_file_paths, test_file_path, classifier_index, log_file_path, True)
+        ml.classify_after_filtering(best_solution, train_file_paths, test_file_path, classifier_index, log_file_path, classifiers, True)
         
         # Print the classification result on test data using all features
         log("All feature-set results:", log_file_path)
-        ml.classify_after_filtering(best_solution, train_file_paths, test_file_path, classifier_index, log_file_path, False)
+        ml.classify_after_filtering(best_solution, train_file_paths, test_file_path, classifier_index, log_file_path, classifiers, False)
     else:
         print("Unknown entry for the mode")

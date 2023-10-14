@@ -5,7 +5,7 @@ import ml
 import csv
 import random
 
-def evaluate_fitness(solution, packets_1, packets_2, classifier_index, pre_solutions, weights):
+def evaluate_fitness(solution, packets_1, packets_2, classifier_index, pre_solutions, weights, classifiers):
     pre_solutions_gen = defaultdict(float)
     n = len(solution)
     k = sum(solution)
@@ -29,8 +29,8 @@ def evaluate_fitness(solution, packets_1, packets_2, classifier_index, pre_solut
     filtered_packets_1 = [[col for col, m in zip(row, solution_new) if m] for row in packets_1]
     filtered_packets_2 = [[col for col, m in zip(row, solution_new) if m] for row in packets_2]
     
-    fitness_1 = ml.classify(filtered_packets_1, filtered_packets_2, classifier_index)[0]
-    fitness_2 = ml.classify(filtered_packets_2, filtered_packets_1, classifier_index)[0]
+    fitness_1 = ml.classify(filtered_packets_1, filtered_packets_2, classifier_index, classifiers)[0]
+    fitness_2 = ml.classify(filtered_packets_2, filtered_packets_1, classifier_index, classifiers)[0]
     average_accuracy = np.mean([fitness_1, fitness_2])
 
     # Calculate feature accuracy
