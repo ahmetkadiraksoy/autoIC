@@ -3,7 +3,10 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVC, LinearSVC
 from sklearn.neural_network import MLPClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.linear_model import LogisticRegression
 from libraries import log
+from wittgenstein import RIPPER
 import multiprocessing
 import pandas as pd
 import subprocess
@@ -327,7 +330,10 @@ if __name__ == '__main__':
         ("SVC", SVC(random_state=42)),
         ("LiSVC", LinearSVC(random_state=42, dual='auto', C=1.0, max_iter=10000)),
         ("MLP", MLPClassifier(hidden_layer_sizes=(50, 10), max_iter=1000, random_state=42)),
-        ("GNB", GaussianNB())
+        ("GNB", GaussianNB()),
+        ("RIP", RIPPER()), # doesn't work with multi-class
+        ("KNN", KNeighborsClassifier()),
+        ("LR", LogisticRegression(multi_class='ovr'))
     ]
 
     # Loop through command-line arguments starting from the second element
@@ -413,9 +419,6 @@ if __name__ == '__main__':
         elif sys.argv[index] in ('-e', '--extract'):
             mode = "extract"
             index += 1
-        elif sys.argv[index] in ('-r', '--report'):
-            mode = "report"
-            index += 1
         elif sys.argv[index] in ('-s', '--statistics'):
             statistical_features_on = True
             index += 1
@@ -467,13 +470,6 @@ if __name__ == '__main__':
         sys.exit(1)
 
     pcap_folder_path = folder + "pcap"
-    if not os.path.exists(pcap_folder_path):
-        print("The 'pcap' folder is missing")
-        sys.exit(1)
-
-    if len([f for f in os.listdir(pcap_folder_path) if f.endswith('.pcap')]) == 0:
-        print("There are no pcap files in the 'pcap' folder")
-        sys.exit(1)
 
     log_file_path = f'{folder}/{protocol}/{log_file_path}'
     if os.path.exists(log_file_path):
@@ -490,6 +486,14 @@ if __name__ == '__main__':
 
     # Run the mode
     if mode == 'extract':
+        if not os.path.exists(pcap_folder_path):
+            print("The 'pcap' folder is missing")
+            sys.exit(1)
+
+        if len([f for f in os.listdir(pcap_folder_path) if f.endswith('.pcap')]) == 0:
+            print("There are no pcap files in the 'pcap' folder")
+            sys.exit(1)
+
         blacklist_file_path = f'{filters_folder}/blacklist.txt'
         feature_names_file_path = f'{filters_folder}/{protocol}.txt'
         protocol_folder_path = f'{folder}{protocol}'
