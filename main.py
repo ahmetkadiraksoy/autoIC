@@ -329,7 +329,7 @@ if __name__ == '__main__':
         ("RF", RandomForestClassifier(random_state=42)),
         ("SVC", SVC(random_state=42)),
         ("LiSVC", LinearSVC(random_state=42, dual='auto', C=1.0, max_iter=10000)),
-        ("MLP", MLPClassifier(hidden_layer_sizes=(50, 10), max_iter=1000, random_state=42)),
+        ("MLP", MLPClassifier(hidden_layer_sizes=(100,), max_iter=200, activation='relu', solver='adam', random_state=42)),
         ("GNB", GaussianNB()),
         ("RIP", RIPPER()), # doesn't work with multi-class
         ("KNN", KNeighborsClassifier()),
