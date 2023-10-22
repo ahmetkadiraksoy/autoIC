@@ -236,7 +236,7 @@ def extract_features_from_pcap(blacklist_file_path, feature_names_file_path, pro
 
         del tshark_output
 
-        # Filter out rows where the 'label' column is not 'NaN'
+        # Remove rows where the 'label' column is 'NaN'
         csv_data = remove_rows_with_nan_values(csv_data)
 
         # Remove duplicates
@@ -490,16 +490,17 @@ if __name__ == '__main__':
             print("The 'pcap' folder is missing")
             sys.exit(1)
 
-        if len([f for f in os.listdir(pcap_folder_path) if f.endswith('.pcap')]) == 0:
-            print("There are no pcap files in the 'pcap' folder")
-            sys.exit(1)
-
         blacklist_file_path = f'{filters_folder}/blacklist.txt'
         feature_names_file_path = f'{filters_folder}/{protocol}.txt'
         protocol_folder_path = f'{folder}{protocol}'
         for i in range(3):
             csv_file_paths.append(f'{folder}{protocol}/batch_{i+1}.csv')
-        pcap_file_names = [f for f in os.listdir(pcap_folder_path) if f.endswith('.pcap')]
+        pcap_file_names = sorted([f for f in os.listdir(pcap_folder_path) if f.endswith('.pcap')])
+
+        if len([f for f in os.listdir(pcap_folder_path) if f.endswith('.pcap')]) == 0:
+            print("There are no pcap files in the 'pcap' folder")
+            sys.exit(1)
+
         pcap_file_paths = [folder + "pcap/" + file_name for file_name in pcap_file_names]
 
         print("converting pcap files to csv format...\n")
@@ -511,6 +512,10 @@ if __name__ == '__main__':
     elif mode == 'report':
         report.run(folder + protocol, classifiers)
     elif mode == 'ga' or mode == 'aco' or mode == 'abc':
+        if os.path.exists(log_file_path):
+            print("There already exists a log file for the given configuration. Exiting...")
+            sys.exit(0)
+
         train_file_paths.append(f'{folder}{protocol}/batch_{order_of_batches[0]}.csv')
         train_file_paths.append(f'{folder}{protocol}/batch_{order_of_batches[1]}.csv')
         test_file_path = f'{folder}{protocol}/batch_{order_of_batches[2]}.csv'

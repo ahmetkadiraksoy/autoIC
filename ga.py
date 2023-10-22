@@ -104,7 +104,7 @@ def genetic_algorithm(pop_size, solution_size, mutation_rate, crossover_rate, tr
             best_solution = generation_best_solution
             best_fitness = generation_best_fitness
             consecutive_same_solution_count = 1
-        elif generation_best_fitness == best_fitness:
+        else:
             consecutive_same_solution_count += 1
 
         sol_str = ''.join(map(str, best_solution))

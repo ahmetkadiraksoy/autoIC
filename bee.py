@@ -128,7 +128,7 @@ def abc_feature_selection(population_size, solution_size, max_trials, num_cores,
             best_solution = generation_best_solution
             best_fitness = generation_best_fitness
             consecutive_same_solution_count = 1
-        elif generation_best_fitness == best_fitness:
+        else:
             consecutive_same_solution_count += 1
 
         sol_str = ''.join(map(str, best_solution))

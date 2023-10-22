@@ -57,8 +57,7 @@ def load_csv_and_filter(classes, fitness_function_file_path, n, log_file_path):
 
             no_of_packets_to_keep = len(lines) if n == 0 else min(n, len(lines))
             packets.extend(lines[:no_of_packets_to_keep]) # Append the selected lines directly to packets
-    
-    # Imputate the data (change NaN to -1) and convert to float
-    packets = [[-1.0 if value == 'NaN' else float(value) for value in packet] for packet in packets]
 
+    packets = [[float(value) for value in packet] for packet in packets]
+    
     return packets
