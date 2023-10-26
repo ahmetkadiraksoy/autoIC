@@ -53,14 +53,11 @@ def remove_rows_with_nan_values(csv_data):
     return [list(row) for row in csv_data if not all(entry == "" for entry in row[:-1])]  # Filter rows with non-empty entries
 
 def modify_dataset(csv_data):
-    # Iterate through rows of the dataset
-    for i in range(len(csv_data)):
-        # Iterate through columns of each row except the label
-        for j in range(len(csv_data[i]) - 1):
+    for i in range(len(csv_data)): # Iterate through rows of the dataset
+        for j in range(len(csv_data[i]) - 1): # Iterate through columns of each row except the label
             cell = csv_data[i][j]
 
-            # If the cell is empty, replace it with '-1'
-            if len(cell) == 0:
+            if len(cell) == 0: # If the cell is empty, replace it with '-1'
                 csv_data[i][j] = '-1'
             else:
                 tokens = cell.split(',')
