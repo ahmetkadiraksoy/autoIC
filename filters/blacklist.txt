@@ -1,4 +1,3 @@
-ip.ttl
 dns.opt.edns_tcp_keepalive.timeout
 dns.srv.port
 dns.svcb.svcparam.port
@@ -30,6 +29,7 @@ ip.opt.time_stamp
 ip.opt.time_stamp_addr
 ip.src
 ip.src_host
+ip.ttl
 mptcp.analysis.echoed_key_mismatch
 mptcp.analysis.missing_algorithm
 mptcp.analysis.unexpected_idsn
@@ -79,8 +79,10 @@ tcp.options.type.class
 tcp.options.type.copy
 tcp.options.type.number
 tcp.options.wscale_val
+tcp.payload
 tcp.pdu.time
 tcp.port
+tcp.segment_data
 tcp.srcport
 tcp.stream
 tcp.syncookie.time
@@ -135,5 +137,3 @@ udp.stream
 udp.time_delta
 udp.time_relative
 udplite.checksum_coverage.bad
-tcp.payload
-tcp.segment_data
