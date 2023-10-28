@@ -137,3 +137,15 @@ udp.stream
 udp.time_delta
 udp.time_relative
 udplite.checksum_coverage.bad
+http.ssl_port
+http.chunkd_and_length
+http.request.uri
+http.file_data
+http.host
+http.request.full_uri
+http.request.line
+http.request.uri
+http.request.uri.path
+http.request.uri.query
+http.request.uri.query.parameter
+http.user_agent

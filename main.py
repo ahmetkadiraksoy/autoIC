@@ -52,6 +52,9 @@ def remove_duplicates_rows(csv_data):
 def remove_rows_with_nan_values(csv_data):
     return [list(row) for row in csv_data if not all(entry == "" for entry in row[:-1])]  # Filter rows with non-empty entries
 
+def remove_symbols(s):
+    return re.sub(r'[^a-zA-Z0-9]', '', s)
+
 def modify_dataset(csv_data):
     for i in range(len(csv_data)): # Iterate through rows of the dataset
         for j in range(len(csv_data[i]) - 1): # Iterate through columns of each row except the label
@@ -65,7 +68,8 @@ def modify_dataset(csv_data):
 
                 # Loop through tokens in the cell
                 for token in tokens:
-                    if token.startswith("0x"):  # Check if the token is hexadecimal
+                    token = remove_symbols(token) # cleanup symbols
+                    if bool(re.match(r'^0x[0-9a-fA-F]+$', token)):  # Check if the token is hexadecimal
                         # Convert hexadecimal to decimal
                         decimal_value = int(token, 16)
                         token = str(decimal_value)
@@ -326,7 +330,7 @@ if __name__ == '__main__':
         ("RF", RandomForestClassifier(random_state=42)),
         ("SVC", SVC(random_state=42)),
         ("LiSVC", LinearSVC(random_state=42, dual='auto', C=1.0, max_iter=10000)),
-        ("MLP", MLPClassifier(hidden_layer_sizes=(100,), max_iter=200, activation='relu', solver='adam', random_state=42)),
+        ("MLP", MLPClassifier(hidden_layer_sizes=(100,), max_iter=1000, activation='relu', solver='adam', random_state=42)),
         ("GNB", GaussianNB()),
         ("RIP", RIPPER()), # doesn't work with multi-class
         ("KNN", KNeighborsClassifier()),

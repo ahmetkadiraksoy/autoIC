@@ -33,7 +33,7 @@ def plot(batches_data, clfs, folder, classifiers, mode):
     plt.subplots_adjust(left=0.17, right=0.99, top=0.98, bottom=0.06)
     plt.ylim([0, 100])
     plt.yticks(fontsize=15)
-    plt.savefig(f"{folder}/plot_" + mode + ".eps", format='eps', dpi=1000)
+    plt.savefig(f"{folder}/plot_" + mode + ".pdf", format='pdf', dpi=1000)
 
 def report(batches_data, clfs, folder, mode):
     file_path = f"{folder}/report_" + mode + ".txt"
