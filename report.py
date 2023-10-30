@@ -42,20 +42,43 @@ def report(batches_data, clfs, folder, mode):
 
     selected_features_all_clfs = []
     for clf in clfs:
+        # Calculate the average accuracy
+        selected_features_f1_max = 0
+        all_features_f1_max = 0
+        for batch_number in range(3):
+            validation_f1_max_index = max((i, batch_data['validation_f1']) for i, batch_data in enumerate(batches_data) if batch_data['classifier'] == clf and batch_data['batch_number'] == (batch_number+1))[0]
+            selected_features_f1_max += batches_data[validation_f1_max_index]['selected_features_f1']
+            all_features_f1_max += batches_data[validation_f1_max_index]['all_features_f1']
+        selected_features_f1_max /= 3
+        all_features_f1_max /= 3
+
+        # Determine the features that were selected the most
         selected_features = [feature for batch_data in batches_data for feature in batch_data['selected_features'] if batch_data['classifier'] == clf]
         selected_features_all_clfs.extend(selected_features)
         sorted_items = sorted(Counter(selected_features).items(), key=lambda x: x[1], reverse=True)
+
+        # Write to file
         with open(file_path, 'a') as file:
-            file.write(f"Classifier: {clf}\n\n")
+            # Wrtie the classifier name
+            file.write(f"Classifier: {clf}\n")
+            
+            # Write the average accuracy
+            file.write(f"\tMaximum F1 of selected features: {selected_features_f1_max}\n")
+            file.write(f"\tMaximum F1 of all features:\t {all_features_f1_max}\n\n")
+
+            # Write the features that were selected the most
+            file.write(f"\tFeatures selected the most:\n")
             for item, count in sorted_items:
-                file.write(f"{count}\t{item}\n")
-            file.write(f"\n")
+                file.write(f"\t\t{count}\t{item}\n")
+            file.write(f"\n\n\n")
     
     sorted_items_all_clfs = sorted(Counter(selected_features_all_clfs).items(), key=lambda x: x[1], reverse=True)
     with open(file_path, 'a') as file:
-            file.write(f"Across all Classifiers:\n\n")
+            # Write the features that were selected the most
+            file.write(f"Across all Classifiers:\n")
+            file.write(f"\tFeatures selected the most:\n")
             for item, count in sorted_items_all_clfs:
-                file.write(f"{count}\t{item}\n")
+                file.write(f"\t\t{count}\t{item}\n")
 
 def run(folder, classifiers):
     file_names = sorted(os.listdir(folder), key=lambda s: [int(c) if c.isdigit() else c for c in re.split('([0-9]+)', s)])

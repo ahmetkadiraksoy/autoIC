@@ -7,6 +7,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.linear_model import LogisticRegression
 from libraries import log
 from wittgenstein import RIPPER
+from sklearn.naive_bayes import GaussianNB
 import multiprocessing
 import pandas as pd
 import subprocess
@@ -334,7 +335,8 @@ if __name__ == '__main__':
         ("GNB", GaussianNB()),
         ("RIP", RIPPER()), # doesn't work with multi-class
         ("KNN", KNeighborsClassifier()),
-        ("LR", LogisticRegression(multi_class='ovr'))
+        ("LR", LogisticRegression(solver='saga', multi_class='ovr', max_iter=10000)),
+        ("NB", GaussianNB())
     ]
 
     # Loop through command-line arguments starting from the second element
