@@ -21,6 +21,97 @@ import json
 import statistics
 import report
 
+def print_usage():
+    print("""
+    Usage: python3 autoic [OPTIONS]
+
+    Options:
+
+    -p, --protocol <protocol>       Specify the protocol to use. This option is required.
+                                    e.g. 'http'
+
+    -t, --tshark-filter <filter>    Apply a tshark filter to the captured traffic. The filter
+                                    should be a valid tshark filter expression. This option
+                                    is used to filter the captured traffic. This option is
+                                    optional. Similar to '-Y' option in tshark. e.g. 'ip'
+                                    which is equivalent to 'tshark -Y ip'.
+
+    -b, --batch <batches>           Define the order of processing batches. This should be a 
+                                    comma-separated list of integers, where the last integer
+                                    indicates the test batch. e.g. '1,2,3' means that the
+                                    first batch is the training batch, the second batch is
+                                    the validation batch, and the third batch is the test
+                                    batch. This option is required.
+
+    -i, --iteration <number>        Set the number of iterations for the process. The value
+                                    should be an integer. This option is set to 10 by default.
+
+    -g, --generation <number>       Specify the maximum number of generations. The value should 
+                                    be an integer. This option is set to 100 by default.
+
+    -w, --weights <weights>         Set the weights for the tool's calculations. This should be 
+                                    two comma-separated list of floating-point numbers, where
+                                    the first number is the weight for the classification and
+                                    the second number is the weight for the number of features.
+                                    This option is set to '0.9,0.1' by default.
+
+    -n <number>                     Set the number of packets to process. The value should be an 
+                                    integer.
+
+    -nc, --num-cores <number>       Specify the maximum number of CPU cores to use. The value
+                                    should be an integer. This option is by default set to '0'
+                                    which means that the tool will use all available CPU cores
+                                    minus 1 by default. One core is reserved for Operating
+                                    System processes.
+
+    -f, --folder <path>             Set the path to the folder where the tool will operate. The 
+                                    path should be a valid folder path on the system. Make sure
+                                    that it contains a 'pcap' folder with the pcap files.
+
+    -r, --run-number <number>       Define the run number for this instance of the tool. This
+                                    parameter is used to distinguish between multiple runs of
+                                    the tool. It allows the tool to generate multiple log files
+                                    one for each run. If not specified, the tool will not append
+                                    the run number to the log file name. Therefore, this parameter
+                                    is optional. The value should be an integer.
+
+    -l, --log <path>                Set the path to the log file where the tool will write its 
+                                    logs. If not specified, the tool will create a log file
+                                    with a default name. The path should be a valid file path.
+
+    -s, --statistics                Enable statistical feature calculation. This option does not 
+                                    require a value. If specified, the tool will calculate
+                                    statistical features for each numeric feature such as
+                                    minimum, maximum, mean, standard deviation, and mode.
+                                    This option is disabled by default.
+
+    -m, --mode <mode>               Set the mode for the tool. The mode should be a string 
+                                    indicating the operation mode. Possible values are:
+                                    'extract', 'report', 'ga', 'aco', and 'abc'. 'Extract'
+                                    mode extracts features from pcap files and writes them
+                                    to CSV files. 'Report' mode generates a report for the
+                                    given protocol. 'GA', 'ACO', and 'ABC' modes run the
+                                    respective algorithms. This option is required.
+
+    -c, --classifier <index>        Specify the classifier index to use. The value should be a 
+                                    valid index integer. This option is required. Possible
+                                    values are:
+                                    0: Decision Tree
+                                    1: Random Forest
+                                    2: SVM
+                                    3: Linear SVM
+                                    4: MLP
+                                    5: Naive Bayes
+                                    6: RIPPER
+                                    7: KNN
+                                    8: Logistic Regression
+                                    9: Naive Bayes
+                                    
+    -h, --help                      Display this help message and exit.
+
+    Note: Replace <placeholders> with actual values without the angle brackets.
+    """)
+
 def is_numeric(input_string):
     try:
         float(input_string) # Attempt to convert the input string to a float
@@ -270,34 +361,6 @@ def extract_features_from_pcap(blacklist_file_path, feature_names_file_path, pro
     # Write remaining field names to file
     write_remaining_field_list_to_file(csv_file_paths, selected_field_list_file_path)
 
-def print_usage():
-    """Print a usage guide for the program."""
-    print("Usage: python script.py [options]")
-    print("Options:")
-    print("  -p, --protocol    Specify the protocol for data extraction")
-    print("  -t, --tshark-filter    Specify the Wireshark (tshark) display filter for extraction")
-    print("  -b, --batch        Specify the order of data batches (comma-separated, e.g., 1,2,3)")
-    print("  -i, --iteration    Specify the number of iterations (default: 10)")
-    print("  -g, --generation   Specify the number of generations (default: 100)")
-    print("  -w, --weights      Specify the weights for multi-objective optimization (comma-separated, e.g., 0.9,0.1)")
-    print("  -n                Specify the number of packets to process (default: 0, process all packets)")
-    print("  -nc, --num-cores   Specify the number of CPU cores to use (default: all available cores - 1)")
-    print("  -f, --folder       Specify the workspace folder")
-    print("  -l, --log          Specify the log file path (default: log.txt)")
-    print("  -e, --extract      Run data extraction mode")
-    print("  -s, --statistics   Enable statistical features extraction")
-    print("  -m, --mode         Specify the optimization mode (ga, aco, abc)")
-    print("  -c, --classifier   Specify the classifier index for machine learning (default: 0)")
-    print("  -h, --help         Show this help message")
-    print()
-    print("Example:")
-    print("python script.py -p http -b 1,2,3 -i 10 -g 100 -w 0.9,0.1 -n 50 -f /path/to/folder -l log.txt -e -m ga -c 0")
-    print()
-    print("Note:")
-    print("- Use commas to separate multiple values for options that accept lists (e.g., -b, -w).")
-    print("- When using options with values, ensure that the value follows the option without spaces.")
-    print("- Use -h or --help to display this help message.")
-
 if __name__ == '__main__':
     if len(sys.argv) < 2: # check if at least one argument is provided
         print("Usage: python script.py arg1 arg2...")
@@ -310,11 +373,11 @@ if __name__ == '__main__':
         sys.exit(1)
 
     # Variables
-    classifier_index = 0
+    classifier_index = ""
     max_num_of_generations = 100
     num_of_iterations = 10
     num_of_packets_to_process = 0
-    order_of_batches = [1,2,3]
+    order_of_batches = []
     weights = [0.9,0.1]
     log_file_path = ""
     mode = ""
@@ -419,9 +482,6 @@ if __name__ == '__main__':
 
             log_file_path = sys.argv[index + 1]
             index += 2  # Skip both the option and its value
-        elif sys.argv[index] in ('-e', '--extract'):
-            mode = "extract"
-            index += 1
         elif sys.argv[index] in ('-s', '--statistics'):
             statistical_features_on = True
             index += 1
@@ -440,7 +500,7 @@ if __name__ == '__main__':
                 print("Missing value for -c/--classifier option")
                 sys.exit(1)
 
-            classifier_index = int(sys.argv[index+1])
+            classifier_index = sys.argv[index+1]
             index += 2  # Skip both the option and its value
         else:
             print(f"Unknown parameter! '{sys.argv[index]}'")
@@ -458,7 +518,7 @@ if __name__ == '__main__':
         log_file_path = (
             "packets_" + str(num_of_packets_to_process) +
             "_mode_" + str(mode) +
-            "_clf_" + str(classifier_index) +
+            "_clf_" + classifier_index +
             "_batch_" + str(batch_number) +
             ("_run_" + str(run_number) if run_number > 0 else "") +
             ".txt"
@@ -513,7 +573,7 @@ if __name__ == '__main__':
             selected_field_list_file_path, statistical_features_on, tshark_filter
         )
     elif mode == 'report':
-        report.run(folder + protocol, classifiers)
+        report.run(folder + protocol, classifiers, classifier_index)
     elif mode == 'ga' or mode == 'aco' or mode == 'abc':
         if os.path.exists(log_file_path):
             print("There already exists a log file for the given configuration. Exiting...")
@@ -527,7 +587,7 @@ if __name__ == '__main__':
         if mode == 'ga':
             log("running GA...\n", log_file_path)
             best_solution, best_fitness = ga.run(
-                train_file_paths, classifier_index, classes_file_path,
+                train_file_paths, int(classifier_index), classes_file_path,
                 num_of_packets_to_process, num_of_iterations, weights,
                 log_file_path, max_num_of_generations, fields_file_path,
                 num_cores, classifiers
@@ -535,7 +595,7 @@ if __name__ == '__main__':
         elif mode == 'aco':
             log("running ACO...\n", log_file_path)
             best_solution, best_fitness = aco.run(
-                train_file_paths, classifier_index, classes_file_path,
+                train_file_paths, int(classifier_index), classes_file_path,
                 num_of_packets_to_process, num_of_iterations, weights,
                 log_file_path, max_num_of_generations, fields_file_path,
                 num_cores, classifiers
@@ -543,7 +603,7 @@ if __name__ == '__main__':
         elif mode == 'abc':
             log("running ABC...\n", log_file_path)
             best_solution, best_fitness = bee.run(
-                train_file_paths, classifier_index, classes_file_path,
+                train_file_paths, int(classifier_index), classes_file_path,
                 num_of_packets_to_process, num_of_iterations, weights,
                 log_file_path, max_num_of_generations, fields_file_path,
                 num_cores, classifiers
@@ -560,10 +620,10 @@ if __name__ == '__main__':
         # Print the classification result on test data using selected features
         log("", log_file_path)
         log("Selected feature-set results:", log_file_path)
-        ml.classify_after_filtering(best_solution, train_file_paths, test_file_path, classifier_index, log_file_path, classifiers, True)
+        ml.classify_after_filtering(best_solution, train_file_paths, test_file_path, int(classifier_index), log_file_path, classifiers, True)
         
         # Print the classification result on test data using all features
         log("All feature-set results:", log_file_path)
-        ml.classify_after_filtering(best_solution, train_file_paths, test_file_path, classifier_index, log_file_path, classifiers, False)
+        ml.classify_after_filtering(best_solution, train_file_paths, test_file_path, int(classifier_index), log_file_path, classifiers, False)
     else:
         print("Unknown entry for the mode")

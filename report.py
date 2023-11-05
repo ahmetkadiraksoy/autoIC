@@ -2,6 +2,7 @@ from collections import Counter
 import os
 import re
 import numpy as np
+import sys
 import matplotlib.pyplot as plt
 from itertools import takewhile
 
@@ -22,7 +23,7 @@ def plot(batches_data, clfs, folder, classifiers, mode):
     nonga_data = process_accuracies(batches_data, clfs, 'all_features_f1')
     labels = [classifiers[int(clf)][0] for clf in clfs]
 
-    ax = plt.subplots(figsize=(3,5))[1]
+    fig, ax = plt.subplots(figsize=(3,5))
     ind, width = np.arange(len(clfs)), 0.30
 
     for offset, color, data in zip([0.15, 0.15 + width], ['#1C6CAB', '#FF7311'], [ga_data, nonga_data]):
@@ -30,10 +31,17 @@ def plot(batches_data, clfs, folder, classifiers, mode):
 
     ax.set_xticks(ind + 0.10 + width / 2)
     ax.set_xticklabels(labels, fontsize=15)
-    plt.subplots_adjust(left=0.17, right=0.99, top=0.98, bottom=0.06)
+    plt.subplots_adjust(left=0.17, right=0.99, top=0.92, bottom=0.06) # Modify top value
     plt.ylim([0, 100])
     plt.yticks(fontsize=15)
-    plt.savefig(f"{folder}/plot_" + mode + ".pdf", format='pdf', dpi=1000)
+
+    # Set the title for the figure
+    protocol_name = batches_data[0]['file_path'].split('/')[1].upper().replace('_', ' & ')
+
+    # Set the title for the figure
+    ax.set_title(protocol_name, fontsize=16)
+
+    plt.savefig(f"{folder}/plot_" + mode + ".pdf", format='pdf', dpi=1000, bbox_inches='tight') # Add bbox_inches
 
 def report(batches_data, clfs, folder, mode):
     file_path = f"{folder}/report_" + mode + ".txt"
@@ -41,14 +49,18 @@ def report(batches_data, clfs, folder, mode):
         os.remove(file_path)
 
     selected_features_all_clfs = []
+
     for clf in clfs:
-        # Calculate the average accuracy
+        # Determine the maximum accuracy
         selected_features_f1_max = 0
         all_features_f1_max = 0
-        for batch_number in range(3):
-            validation_f1_max_index = max((i, batch_data['validation_f1']) for i, batch_data in enumerate(batches_data) if batch_data['classifier'] == clf and batch_data['batch_number'] == (batch_number+1))[0]
+        files_f1_max = []
+        number_of_batches = len(set(entry['batch_number'] for entry in batches_data))
+        for batch_number in range(number_of_batches): # for each batch
+            validation_f1_max_index = max((i for i, batch_data in enumerate(batches_data) if batch_data['classifier'] == clf and batch_data['batch_number'] == (batch_number+1)), key=lambda index: batches_data[index]['validation_f1'])
             selected_features_f1_max += batches_data[validation_f1_max_index]['selected_features_f1']
             all_features_f1_max += batches_data[validation_f1_max_index]['all_features_f1']
+            files_f1_max.append(os.path.basename(batches_data[validation_f1_max_index]['file_path']))
         selected_features_f1_max /= 3
         all_features_f1_max /= 3
 
@@ -64,7 +76,11 @@ def report(batches_data, clfs, folder, mode):
             
             # Write the average accuracy
             file.write(f"\tMaximum F1 of selected features: {selected_features_f1_max}\n")
-            file.write(f"\tMaximum F1 of all features:\t {all_features_f1_max}\n\n")
+            file.write(f"\tMaximum F1 of all features:\t {all_features_f1_max}\n")
+            file.write(f"\tMaximum F1 yielding files:\n")
+            for file_f1_max in files_f1_max:
+                file.write(f"\t\t{file_f1_max}\n")
+            file.write("\n")
 
             # Write the features that were selected the most
             file.write(f"\tFeatures selected the most:\n")
@@ -80,7 +96,7 @@ def report(batches_data, clfs, folder, mode):
             for item, count in sorted_items_all_clfs:
                 file.write(f"\t\t{count}\t{item}\n")
 
-def run(folder, classifiers):
+def run(folder, classifiers, classifier_indices):
     file_names = sorted(os.listdir(folder), key=lambda s: [int(c) if c.isdigit() else c for c in re.split('([0-9]+)', s)])
     full_paths = [os.path.join(folder, file) for file in file_names if file.startswith("packets_") and file.endswith(".txt")]
 
@@ -109,7 +125,14 @@ def run(folder, classifiers):
                     "file_path": path
                 })
 
-        clfs = sorted(list(set(batch_data['classifier'] for batch_data in batches_data)))
+        if classifier_indices == "":
+            clfs = sorted(list(set(batch_data['classifier'] for batch_data in batches_data)))
+        else:
+            clfs = list(map(int, classifier_indices.split(',')))
+            for clf in clfs:
+                if clf not in list(set(batch_data['classifier'] for batch_data in batches_data)):
+                    print(f"Classifier {clf} not found in the data. Exiting...")
+                    sys.exit(1)
         print("plotting the diagram...")
         plot(batches_data, clfs, folder, classifiers, mode)
         print("generating the report...")
